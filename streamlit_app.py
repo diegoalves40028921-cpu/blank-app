@@ -47,22 +47,4 @@ def carregar_dados():
 def img_to_base64(image_file):
     if image_file:
         img = Image.open(image_file)
-        img = img.convert("RGB")
-        img = img.resize((350, 350)) 
-        buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=60)
-        return base64.b64encode(buffered.getvalue()).decode()
-    return ""
-
-# --- CONTEÚDO PRINCIPAL ---
-st.title("📸 CrismaGram")
-
-aba_perfil, aba_gerenciar = st.tabs(["🔍 Ver Perfil", "⚙️ Cadastrar / Atualizar"])
-
-# --- ABA 1: VISUALIZAR PERFIL DETALHADO ---
-with aba_perfil:
-    df = carregar_dados()
-    
-    if not df.empty:
-        df = df.dropna(subset=["Nome"])
-        df = df[df["Nome"].astype(str).str.strip
+        img =
