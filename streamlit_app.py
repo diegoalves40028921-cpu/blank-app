@@ -61,7 +61,7 @@ def img_to_base64(image_file):
 # --- CONTEÚDO PRINCIPAL ---
 st.title("📸 CrismaGram")
 
-aba_perfil, aba_gerenciar = st.tabs(["🔍 Ver Perfil", "⚙️ Cadastrar / Atualizar"])
+aba_perfil, aba_gerenciar = st.tabs(["🔍 Ver Perfil", "⚙️ Cadastrar / Gerenciar"])
 
 # --- ABA 1: VISUALIZAR PERFIL DETALHADO ---
 with aba_perfil:
@@ -90,7 +90,6 @@ with aba_perfil:
             # --- CARD DO PERFIL ---
             st.markdown('<div class="profile-card">', unsafe_allow_html=True)
             
-            # Exibição Inteligente da Foto
             foto_string = str(row['Foto']).strip() if pd.notna(row['Foto']) else ""
             if len(foto_string) > 100:
                 if "data:image" in foto_string:
@@ -102,17 +101,14 @@ with aba_perfil:
             st.markdown(f'<div class="profile-name">{row["Nome"]}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="profile-detail">Membro da <strong>{row["Turma"]}</strong></div>', unsafe_allow_html=True)
             
-            # Alertas de Sacramentos
             if str(row['Batismo']).strip().upper() == "NÃO":
                 st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM BATISMO</div>', unsafe_allow_html=True)
             if str(row['Eucaristia']).strip().upper() == "NÃO":
                 st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>', unsafe_allow_html=True)
                 
-            # Nível de Presença
             presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
             st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
             
-            # Qualidades e Defeitos Formatados
             qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
             defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
             
@@ -124,9 +120,9 @@ with aba_perfil:
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ABA 2: CADASTRAR OU ATUALIZAR ---
+# --- ABA 2: CADASTRAR, EDITAR OU DELETAR ---
 with aba_gerenciar:
-    st.markdown("### 📝 Cadastrar ou Modificar Perfil")
+    st.markdown("### 📝 Painel de Administração de Perfis")
     
     df_lista = carregar_dados()
     nomes_existentes = []
@@ -134,107 +130,126 @@ with aba_gerenciar:
         df_lista = df_lista.dropna(subset=["Nome"])
         nomes_existentes = [n for n in df_lista["Nome"].tolist() if str(n).strip() != ""]
 
-    modo = st.radio("Como deseja prosseguir?", ["Criar novo perfil (Digitar)", "Editar um perfil existente (Selecionar)"], horizontal=True)
+    modo = st.radio("O que deseja fazer?", ["Criar novo perfil (Digitar)", "Editar perfil existente", "❌ Excluir um perfil"], horizontal=True)
     
-    # --- VARIÁVEIS PADRÃO PARA O FORMULÁRIO (ZERA TUDO CASO SEJA NOVO) ---
-    val_nome = ""
-    val_turma = "Turma 1"
-    val_presenca = "Média"
-    val_batismo = "Sim"
-    val_eucaristia = "Sim"
-    val_qualidades = ""
-    val_defeitos = ""
-    val_foto_atual = ""
-    
-    # Se escolher Editar e existirem nomes, buscamos os dados atuais na planilha
-    if modo == "Editar um perfil existente (Selecionar)" and nomes_existentes:
-        nome_editado = st.selectbox("Escolha o Crismando para Modificar", nomes_existentes)
-        val_nome = nome_editado
-        
-        # Filtra a linha correspondente na planilha
-        dados_usuario = df_lista[df_lista["Nome"] == nome_editado].iloc[0]
-        
-        # Atribui os valores antigos às variáveis para preencher o formulário abaixo
-        lista_turmas = ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"]
-        val_turma = dados_usuario["Turma"] if dados_usuario["Turma"] in lista_turmas else "Turma 1"
-        
-        lista_presenca = ["Baixa", "Média", "Alta"]
-        val_presenca = dados_usuario["Presenca"] if dados_usuario["Presenca"] in lista_presenca else "Média"
-        
-        val_batismo = "Não" if str(dados_usuario["Batismo"]).strip().upper() == "NÃO" else "Sim"
-        val_eucaristia = "Não" if str(dados_usuario["Eucaristia"]).strip().upper() == "NÃO" else "Sim"
-        
-        val_qualidades = str(dados_usuario["Qualidades"]) if pd.notna(dados_usuario["Qualidades"]) and str(dados_usuario["Qualidades"]).strip() != "nan" else ""
-        val_defeitos = str(dados_usuario["Defeitos"]) if pd.notna(dados_usuario["Defeitos"]) and str(dados_usuario["Defeitos"]).strip() != "nan" else ""
-        val_foto_atual = str(dados_usuario["Foto"]).strip() if pd.notna(dados_usuario["Foto"]) else ""
-
-    # --- FORMULÁRIO DE CADASTRO/EDIÇÃO ---
-    with st.form("form_cadastro", clear_on_submit=True):
-        if modo != "Editar um perfil existente (Selecionar)" or not nomes_existentes:
-            nome = st.text_input("Nome completo do Crismando *", value=val_nome)
+    # --- FLUXO 1: DELETAR PERFIL ---
+    if modo == "❌ Excluir um perfil":
+        if not nomes_existentes:
+            st.warning("Não há nenhum perfil cadastrado para excluir.")
         else:
-            # Em modo de edição, apenas exibe textualmente o nome travado
-            st.markdown(f"**Modificando o perfil de:** `{val_nome}`")
-            nome = val_nome
+            st.markdown("#### 🗑️ Excluir Crismando definitivamente")
+            nome_para_deletar = st.selectbox("Selecione o perfil que deseja APAGAR:", nomes_existentes, key="del_box")
             
-        turmas_disponiveis = ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"]
-        idx_turma = turmas_disponiveis.index(val_turma)
-        turma = st.selectbox("Turma", turmas_disponiveis, index=idx_turma)
-        
-        presencas_disponiveis = ["Baixa", "Média", "Alta"]
-        idx_presenca = presencas_disponiveis.index(val_presenca)
-        presenca = st.select_slider("Nível de Presença", options=presencas_disponiveis, value=val_presenca)
-        
-        col1, col2 = st.columns(2)
-        idx_batismo = 1 if val_batismo == "Não" else 0
-        batismo = col1.radio("Possui Batismo?", ["Sim", "Não"], index=idx_batismo)
-        
-        idx_eucaristia = 1 if val_eucaristia == "Não" else 0
-        eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"], index=idx_eucaristia)
-        
-        qualidades_input = st.text_area("Escreva as Qualidades:", value=val_qualidades)
-        defeitos_input = st.text_area("Escreva os Defeitos:", value=val_defeitos)
-        
-        # Melhoria Visual da Foto na Edição
-        if val_foto_atual and len(val_foto_atual) > 100:
-            st.markdown("📷 **Foto atual salva na planilha:**")
-            if "data:image" in val_foto_atual:
-                val_foto_atual = val_foto_atual.split(",")[-1]
-            st.image(f"data:image/jpeg;base64,{val_foto_atual}", width=100)
-            foto = st.file_uploader("Deseja alterar a Foto de Perfil? (Deixe em branco para manter a atual)", type=["jpg", "png"])
-        else:
-            foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
-        
-        if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
-            if not nome or not str(nome).strip():
-                st.error("O campo Nome é obrigatório!")
-            else:
-                # Se for edição e o usuário não enviou uma nova foto, mantém a foto antiga string no payload
-                string_foto = img_to_base64(foto) if foto else (val_foto_atual if val_foto_atual else "")
-                
-                payload = {
-                    "Nome": str(nome).strip(), 
-                    "Turma": turma, 
-                    "Presenca": presenca,
-                    "Batismo": batismo, 
-                    "Eucaristia": eucaristia,
-                    "Qualidades": qualidades_input, 
-                    "Defeitos": defeitos_input,
-                    "Foto": string_foto
-                }
-                
-                with st.spinner("Conectando ao banco de dados Google..."):
+            st.warning(f"⚠️ **Atenção:** Você está prestes a apagar permanentemente o perfil de **{nome_para_deletar}** da planilha. Esta ação não pode ser desfeita.")
+            
+            confirmou = st.checkbox(f"Estou ciente e quero deletar permanentemente o perfil de {nome_para_deletar}.", value=False)
+            
+            if st.button("🔥 Confirmar Exclusão Definitiva", disabled=not confirmou, type="primary"):
+                payload_delete = {"Nome": nome_para_deletar, "Acao": "EXCLUIR"}
+                with st.spinner("Excluindo registro no Google Sheets..."):
                     try:
-                        res = requests.post(url_script_google, json=payload, allow_redirects=True)
-                        
+                        res = requests.post(url_script_google, json=payload_delete, allow_redirects=True)
                         if res.status_code == 200:
                             st.success(f"🎉 {res.text}")
                             st.cache_data.clear()
                             time.sleep(2.0)
                             st.rerun()
-                        elif res.status_code == 401:
-                            st.error("⚠️ Erro 401: Acesso negado pelo Google. Mude 'Quem tem acesso' para 'Qualquer pessoa'.")
                         else:
-                            st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
+                            st.error(f"Erro do servidor Google: {res.status_code}")
                     except Exception as e:
-                        st.error(f"Erro crítico de conexão: {e}")
+                        st.error(f"Erro de rede ao tentar deletar: {e}")
+
+    # --- FLUXO 2: FORMULÁRIO DE CRIAR / EDITAR ---
+    else:
+        val_nome = ""
+        val_turma = "Turma 1"
+        val_presenca = "Média"
+        val_batismo = "Sim"
+        val_eucaristia = "Sim"
+        val_qualidades = ""
+        val_defeitos = ""
+        val_foto_atual = ""
+        
+        if modo == "Editar perfil existente" and nomes_existentes:
+            nome_editado = st.selectbox("Escolha o Crismando para Modificar", nomes_existentes)
+            val_nome = nome_editado
+            
+            dados_usuario = df_lista[df_lista["Nome"] == nome_editado].iloc[0]
+            
+            lista_turmas = ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"]
+            val_turma = dados_usuario["Turma"] if dados_usuario["Turma"] in lista_turmas else "Turma 1"
+            
+            lista_presenca = ["Baixa", "Média", "Alta"]
+            val_presenca = dados_usuario["Presenca"] if dados_usuario["Presenca"] in lista_presenca else "Média"
+            
+            val_batismo = "Não" if str(dados_usuario["Batismo"]).strip().upper() == "NÃO" else "Sim"
+            val_eucaristia = "Não" if str(dados_usuario["Eucaristia"]).strip().upper() == "NÃO" else "Sim"
+            
+            val_qualidades = str(dados_usuario["Qualidades"]) if pd.notna(dados_usuario["Qualidades"]) and str(dados_usuario["Qualidades"]).strip() != "nan" else ""
+            val_defeitos = str(dados_usuario["Defeitos"]) if pd.notna(dados_usuario["Defeitos"]) and str(dados_usuario["Defeitos"]).strip() != "nan" else ""
+            val_foto_atual = str(dados_usuario["Foto"]).strip() if pd.notna(dados_usuario["Foto"]) else ""
+
+        with st.form("form_cadastro", clear_on_submit=True):
+            if modo != "Editar perfil existente" or not nomes_existentes:
+                nome = st.text_input("Nome completo do Crismando *", value=val_nome)
+            else:
+                st.markdown(f"**Modificando o perfil de:** `{val_nome}`")
+                nome = val_nome
+                
+            turmas_disponiveis = ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"]
+            idx_turma = turmas_disponiveis.index(val_turma)
+            turma = st.selectbox("Turma", turmas_disponiveis, index=idx_turma)
+            
+            presencas_disponiveis = ["Baixa", "Média", "Alta"]
+            idx_presenca = presencas_disponiveis.index(val_presenca)
+            presenca = st.select_slider("Nível de Presença", options=presencas_disponiveis, value=val_presenca)
+            
+            col1, col2 = st.columns(2)
+            idx_batismo = 1 if val_batismo == "Não" else 0
+            batismo = col1.radio("Possui Batismo?", ["Sim", "Não"], index=idx_batismo)
+            
+            idx_eucaristia = 1 if val_eucaristia == "Não" else 0
+            eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"], index=idx_eucaristia)
+            
+            qualidades_input = st.text_area("Escreva as Qualidades:", value=val_qualidades)
+            defeitos_input = st.text_area("Escreva os Defeitos:", value=val_defeitos)
+            
+            if val_foto_atual and len(val_foto_atual) > 100:
+                st.markdown("📷 **Foto atual salva na planilha:**")
+                if "data:image" in val_foto_atual:
+                    val_foto_atual = val_foto_atual.split(",")[-1]
+                st.image(f"data:image/jpeg;base64,{val_foto_atual}", width=100)
+                foto = st.file_uploader("Deseja alterar a Foto de Perfil? (Deixe em branco para manter a atual)", type=["jpg", "png"])
+            else:
+                foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
+            
+            if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
+                if not nome or not str(nome).strip():
+                    st.error("O campo Nome é obrigatório!")
+                else:
+                    string_foto = img_to_base64(foto) if foto else (val_foto_atual if val_foto_atual else "")
+                    
+                    payload = {
+                        "Nome": str(nome).strip(), 
+                        "Turma": turma, 
+                        "Presenca": presenca,
+                        "Batismo": batismo, 
+                        "Eucaristia": eucaristia,
+                        "Qualidades": qualidades_input, 
+                        "Defeitos": defeitos_input,
+                        "Foto": string_foto,
+                        "Acao": "SALVAR"
+                    }
+                    
+                    with st.spinner("Conectando ao banco de dados Google..."):
+                        try:
+                            res = requests.post(url_script_google, json=payload, allow_redirects=True)
+                            if res.status_code == 200:
+                                st.success(f"🎉 {res.text}")
+                                st.cache_data.clear()
+                                time.sleep(2.0)
+                                st.rerun()
+                            else:
+                                st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
+                        except Exception as e:
+                            st.error(f"Erro crítico de conexão: {e}")
