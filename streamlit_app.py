@@ -32,13 +32,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONEXÃO COM GOOGLE SHEETS ---
-# Cole abaixo o link completo da sua planilha Google
+# IMPORTANTE: Garanta que sua planilha esteja configurada como "Qualquer pessoa com o link pode editar"
 url_planilha = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" 
 
+# Método seguro para inicializar a conexão
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
     try:
+        # Força o recarregamento limpando o cache para trazer novos registros na hora
+        st.cache_data.clear()
         return conn.read(spreadsheet=url_planilha)
     except Exception:
         return pd.DataFrame(columns=["Nome", "Turma", "Presenca", "Notas", "Batismo", "Eucaristia", "ParaTirar", "Foto"])
@@ -48,7 +51,7 @@ def img_to_base64(image_file):
     if image_file:
         img = Image.open(image_file)
         
-        # Se a imagem tiver transparência (comum em PNG), adiciona fundo branco
+        # Trata transparências de arquivos PNG
         if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
             background = Image.new("RGB", img.size, (255, 255, 255))
             background.paste(img, mask=img.convert("RGBA").split()[3])
@@ -56,7 +59,6 @@ def img_to_base64(image_file):
         elif img.mode != "RGB":
             img = img.convert("RGB")
             
-        # Redimensiona para um quadrado perfeito otimizado
         img = img.resize((400, 400)) 
         
         buffered = io.BytesIO()
@@ -147,7 +149,6 @@ with aba_novo:
         
         botao_enviar = st.form_submit_button("Publicar Perfil")
         
-    # Processamento fora do escopo do form (Evita o erro de Submit Button)
     if botao_enviar:
         if nome:
             foto_base64 = img_to_base64(arquivo_foto)
@@ -163,10 +164,14 @@ with aba_novo:
                 "Foto": foto_base64
             }])
             
-            df_atualizado = pd.concat([df_atual, nova_linha], ignore_index=True)
-            conn.update(spreadsheet=url_planilha, data=df_atualizado)
-            
-            st.success("Perfil publicado com sucesso!")
-            st.rerun()
+            try:
+                # Tenta concatenar os dados e atualizar usando o método padrão
+                df_atualizado = pd.concat([df_atual, nova_linha], ignore_index=True)
+                conn.update(spreadsheet=url_planilha, data=df_atualizado)
+                st.success("Perfil publicado com sucesso!")
+                st.rerun()
+            except Exception as e:
+                # Alternativa caso o Streamlit Cloud bloqueie a escrita direta na sua conta Google:
+                st.error("Erro de permissão no Google Sheets. Certifique-se de que a planilha está compartilhada na opção 'Qualquer pessoa com o link pode editar'.")
         else:
             st.error("Por favor, preencha o nome.")
