@@ -168,6 +168,7 @@ with aba_gerenciar:
                     "Defeitos": defeitos_input,
                     "Foto": img_to_base64(foto) if foto else ""
                 }
+                
                 try:
                     res = requests.post(url_script_google, json=payload)
                     if res.status_code == 200:
