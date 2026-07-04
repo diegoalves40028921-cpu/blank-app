@@ -1,5 +1,4 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from PIL import Image
 import base64
@@ -10,7 +9,8 @@ import requests
 st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
 
 # --- LINKS ---
-url_planilha = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/edit?usp=sharing"
+url_planilha_csv = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/export?format=csv"
+# Cole aqui a nova URL gerada no PASSO 2 (após mudar para 'Qualquer pessoa')
 url_script_google = "https://script.google.com/macros/s/AKfycbzMq22vbopzFdvVD6gfliJu9McSAJetnmbEd_YxerKkJtuM4Fl9jwiKDUiUqug4gvhI4Q/exec"
 
 # --- ESTILO CSS PARA O PERFIL ---
@@ -18,7 +18,7 @@ st.markdown("""
     <style>
     .main { background-color: #FAFAFA; }
     .profile-card { background-color: white; border: 1px solid #DBDBDB; border-radius: 12px; padding: 24px; margin-top: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.02); }
-    .profile-name { font-size: 24px; font-weight: bold; color: #262626; margin-bottom: 4px; }
+    .profile-name { font-size: 24px; font-weight: bold; color: #262626; margin-bottom: 4px; margin-top: 15px; }
     .profile-detail { font-size: 14px; color: #8E8E8E; margin-bottom: 15px; }
     .badge-presenca { background-color: #E8F0FE; color: #1A73E8; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; display: inline-block; margin-bottom: 15px; }
     .alert-box { background-color: #FFEBEB; border-left: 4px solid #FF4B4B; color: #D93025; padding: 10px; border-radius: 4px; font-size: 13px; font-weight: bold; margin-bottom: 10px; }
@@ -27,30 +27,38 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-@st.cache_data(ttl=2)
+# --- FUNÇÃO DE CARREGAR DADOS ---
+@st.cache_data(ttl=1)
 def carregar_dados():
     colunas_necessarias = ["Nome", "Turma", "Presenca", "Batismo", "Eucaristia", "Qualidades", "Defeitos", "Foto"]
     try:
-        df = conn.read(spreadsheet=url_planilha)
-        for col in colunas_necessarias:
-            if col not in df.columns:
-                df[col] = ""
-        return df
-    except:
+        response = requests.get(url_planilha_csv)
+        if response.status_code == 200:
+            df = pd.read_csv(io.StringIO(response.text), dtype=str)
+            for col in colunas_necessarias:
+                if col not in df.columns:
+                    df[col] = ""
+            return df
+        elif response.status_code == 404:
+            st.error("⚠️ **Erro 404: Planilha Privada!** Vá à sua Planilha do Google, clique em **Partilhar** no canto superior direito e mude o acesso geral para **'Qualquer pessoa com o link pode ver'**.")
+            return pd.DataFrame(columns=colunas_necessarias)
+        else:
+            return pd.DataFrame(columns=colunas_necessarias)
+    except Exception as e:
         return pd.DataFrame(columns=colunas_necessarias)
 
+# --- FUNÇÃO PARA CONVERTER IMAGEM ---
 def img_to_base64(image_file):
     if image_file:
         img = Image.open(image_file)
         img = img.convert("RGB")
-        img = img.resize((400, 400)) 
+        img = img.resize((350, 350)) 
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=75)
+        img.save(buffered, format="JPEG", quality=60)
         return base64.b64encode(buffered.getvalue()).decode()
     return ""
 
+# --- CONTEÚDO PRINCIPAL ---
 st.title("📸 CrismaGram")
 
 aba_perfil, aba_gerenciar = st.tabs(["🔍 Ver Perfil", "⚙️ Cadastrar / Atualizar"])
@@ -65,7 +73,7 @@ with aba_perfil:
         df = df[df["Nome"].astype(str).str.contains(r'[a-zA-Z]', na=False)]
         
     if df.empty:
-        st.info("Nenhum perfil cadastrado ainda. Vá na aba de gerenciamento ao lado!")
+        st.info("Nenhum perfil válido carregado. Certifique-se de configurar o acesso da planilha e registar o primeiro membro.")
     else:
         st.markdown("### Selecione quem deseja visualizar:")
         col_t, col_n = st.columns(2)
@@ -83,10 +91,13 @@ with aba_perfil:
             st.markdown('<div class="profile-card">', unsafe_allow_html=True)
             
             # Exibição da Foto
-            if pd.notna(row['Foto']) and len(str(row['Foto'])) > 100:
-                st.image(f"data:image/jpeg;base64,{row['Foto']}", width=250)
+            foto_string = str(row['Foto']).strip() if pd.notna(row['Foto']) else ""
+            if len(foto_string) > 100:
+                if "data:image" in foto_string:
+                    foto_string = foto_string.split(",")[-1]
+                st.image(f"data:image/jpeg;base64,{foto_string}", width=220)
             else:
-                st.info("👤 Este perfil está sem foto de identificação.")
+                st.warning("👤 Perfil sem foto de identificação disponível.")
                 
             st.markdown(f'<div class="profile-name">{row["Nome"]}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="profile-detail">Membro da <strong>{row["Turma"]}</strong></div>', unsafe_allow_html=True)
@@ -98,12 +109,12 @@ with aba_perfil:
                 st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>', unsafe_allow_html=True)
                 
             # Nível de Presença
-            presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Média"
+            presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
             st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
             
             # Qualidades e Defeitos Formatados
             qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
-            defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito ou ponto a melhorar registrado."
+            defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
             
             st.markdown('<div class="section-title">✅ Qualidades / Pontos Positivos:</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="section-content">{qualidades_val}</div>', unsafe_allow_html=True)
@@ -116,7 +127,6 @@ with aba_perfil:
 # --- ABA 2: CADASTRAR OU ATUALIZAR ---
 with aba_gerenciar:
     st.markdown("### 📝 Cadastrar ou Modificar Perfil")
-    st.caption("Se você digitar ou selecionar um nome que já existe, o sistema atualizará a linha dele na planilha.")
     
     df_lista = carregar_dados()
     nomes_existentes = []
@@ -141,7 +151,7 @@ with aba_gerenciar:
         
         qualidades = st.text_area("Escreva as Qualidades:")
         defeitos = st.text_area("Escreva os Defeitos:")
-        foto = st.file_uploader("Foto de Perfil (Deixe em branco para manter a atual se estiver editando)", type=["jpg", "png"])
+        foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
         
         if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
             if not nome or not str(nome).strip():
@@ -160,10 +170,12 @@ with aba_gerenciar:
                 try:
                     res = requests.post(url_script_google, json=payload)
                     if res.status_code == 200:
-                        st.success(f"Dados salvos com sucesso!")
+                        st.success("Dados salvos com sucesso!")
                         st.cache_data.clear()
                         st.rerun()
+                    elif res.status_code == 401:
+                        st.error("⚠️ **Erro 401: Não Autorizado!** No Google Apps Script, vá em **Implantar** > **Gerenciar implantações**, clique no **Lápis** e mude o campo **'Quem tem acesso'** para **'Qualquer pessoa'**.")
                     else:
-                        st.error("Erro ao enviar dados para o Google Sheets.")
+                        st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
                 except Exception as e:
                     st.error(f"Erro de conexão: {e}")
