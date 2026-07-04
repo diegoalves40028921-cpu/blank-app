@@ -10,7 +10,7 @@ st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="center
 
 # --- LINKS ---
 url_planilha_csv = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/export?format=csv"
-# Cole aqui a nova URL gerada no PASSO 2 (após mudar para 'Qualquer pessoa')
+# Cole aqui a nova URL que copiou após atualizar o Google Apps Script
 url_script_google = "https://script.google.com/macros/s/AKfycbzMq22vbopzFdvVD6gfliJu9McSAJetnmbEd_YxerKkJtuM4Fl9jwiKDUiUqug4gvhI4Q/exec"
 
 # --- ESTILO CSS PARA O PERFIL ---
@@ -35,12 +35,13 @@ def carregar_dados():
         response = requests.get(url_planilha_csv)
         if response.status_code == 200:
             df = pd.read_csv(io.StringIO(response.text), dtype=str)
+            # Garante que todas as colunas necessárias existem no DataFrame
             for col in colunas_necessarias:
                 if col not in df.columns:
                     df[col] = ""
             return df
         elif response.status_code == 404:
-            st.error("⚠️ **Erro 404: Planilha Privada!** Vá à sua Planilha do Google, clique em **Partilhar** no canto superior direito e mude o acesso geral para **'Qualquer pessoa com o link pode ver'**.")
+            st.error("⚠️ **Erro 404: Planilha Privada!** No canto superior direito da Planilha do Google, mude o acesso geral para **'Qualquer pessoa com o link pode ver'**.")
             return pd.DataFrame(columns=colunas_necessarias)
         else:
             return pd.DataFrame(columns=colunas_necessarias)
@@ -73,7 +74,7 @@ with aba_perfil:
         df = df[df["Nome"].astype(str).str.contains(r'[a-zA-Z]', na=False)]
         
     if df.empty:
-        st.info("Nenhum perfil válido carregado. Certifique-se de configurar o acesso da planilha e registar o primeiro membro.")
+        st.info("Nenhum perfil válido carregado. Configure a planilha e registe o primeiro membro na aba ao lado.")
     else:
         st.markdown("### Selecione quem deseja visualizar:")
         col_t, col_n = st.columns(2)
@@ -90,7 +91,7 @@ with aba_perfil:
             # --- CARD DO PERFIL ---
             st.markdown('<div class="profile-card">', unsafe_allow_html=True)
             
-            # Exibição da Foto
+            # Exibição Inteligente da Foto
             foto_string = str(row['Foto']).strip() if pd.notna(row['Foto']) else ""
             if len(foto_string) > 100:
                 if "data:image" in foto_string:
@@ -112,7 +113,7 @@ with aba_perfil:
             presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
             st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
             
-            # Qualidades e Defeitos Formatados
+            # Qualidades e Defeitos Formatados Corretamente
             qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
             defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
             
@@ -149,8 +150,8 @@ with aba_gerenciar:
         batismo = col1.radio("Possui Batismo?", ["Sim", "Não"])
         eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"])
         
-        qualidades = st.text_area("Escreva as Qualidades:")
-        defeitos = st.text_area("Escreva os Defeitos:")
+        qualidades_input = st.text_area("Escreva as Qualidades:")
+        defeitos_input = st.text_area("Escreva os Defeitos:")
         foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
         
         if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
@@ -158,24 +159,4 @@ with aba_gerenciar:
                 st.error("O campo Nome é obrigatório!")
             else:
                 payload = {
-                    "Nome": str(nome).strip(), 
-                    "Turma": turma, 
-                    "Presenca": presenca,
-                    "Batismo": batismo, 
-                    "Eucaristia": eucaristia,
-                    "Qualidades": qualidades, 
-                    "Defeitos": defeitos,
-                    "Foto": img_to_base64(foto) if foto else ""
-                }
-                try:
-                    res = requests.post(url_script_google, json=payload)
-                    if res.status_code == 200:
-                        st.success("Dados salvos com sucesso!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    elif res.status_code == 401:
-                        st.error("⚠️ **Erro 401: Não Autorizado!** No Google Apps Script, vá em **Implantar** > **Gerenciar implantações**, clique no **Lápis** e mude o campo **'Quem tem acesso'** para **'Qualquer pessoa'**.")
-                    else:
-                        st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
-                except Exception as e:
-                    st.error(f"Erro de conexão: {e}")
+                    "Nome":
