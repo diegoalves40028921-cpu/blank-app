@@ -13,21 +13,23 @@ st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="center
 url_planilha = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/edit?usp=sharing"
 url_script_google = "https://script.google.com/macros/s/AKfycbzMq22vbopzFdvVD6gfliJu9McSAJetnmbEd_YxerKkJtuM4Fl9jwiKDUiUqug4gvhI4Q/exec"
 
-# --- ESTILO CSS ---
+# --- ESTILO CSS PARA O PERFIL ---
 st.markdown("""
     <style>
     .main { background-color: #FAFAFA; }
-    .post-card { background-color: white; border: 1px solid #DBDBDB; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
-    .post-header { padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #FAFAFA; font-weight: bold;}
-    .post-content { padding: 12px; }
-    .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 5px; display: inline-block; background-color: #f0f2f6; }
-    .alert-badge { background-color: #FF4B4B; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; }
+    .profile-card { background-color: white; border: 1px solid #DBDBDB; border-radius: 12px; padding: 24px; margin-top: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.02); }
+    .profile-name { font-size: 24px; font-weight: bold; color: #262626; margin-bottom: 4px; }
+    .profile-detail { font-size: 14px; color: #8E8E8E; margin-bottom: 15px; }
+    .badge-presenca { background-color: #E8F0FE; color: #1A73E8; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; display: inline-block; margin-bottom: 15px; }
+    .alert-box { background-color: #FFEBEB; border-left: 4px solid #FF4B4B; color: #D93025; padding: 10px; border-radius: 4px; font-size: 13px; font-weight: bold; margin-bottom: 10px; }
+    .section-title { font-size: 16px; font-weight: bold; color: #262626; margin-top: 15px; margin-bottom: 5px; display: flex; align-items: center; }
+    .section-content { background-color: #F8F9FA; padding: 12px; border-radius: 8px; font-size: 14px; color: #4A4A4A; border: 1px solid #E0E0E0; line-height: 1.5; }
     </style>
 """, unsafe_allow_html=True)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=2)
 def carregar_dados():
     colunas_necessarias = ["Nome", "Turma", "Presenca", "Batismo", "Eucaristia", "Qualidades", "Defeitos", "Foto"]
     try:
@@ -51,60 +53,70 @@ def img_to_base64(image_file):
 
 st.title("📸 CrismaGram")
 
-aba_feed, aba_gerenciar = st.tabs(["🏠 Feed de Membros", "⚙️ Cadastrar / Atualizar Perfil"])
+aba_perfil, aba_gerenciar = st.tabs(["🔍 Ver Perfil", "⚙️ Cadastrar / Atualizar"])
 
-# --- ABA 1: FEED DE MEMBROS ---
-with aba_feed:
+# --- ABA 1: VISUALIZAR PERFIL DETALHADO ---
+with aba_perfil:
     df = carregar_dados()
     
     if not df.empty:
         df = df.dropna(subset=["Nome"])
         df = df[df["Nome"].astype(str).str.strip() != ""]
         df = df[df["Nome"].astype(str).str.contains(r'[a-zA-Z]', na=False)]
-    
+        
     if df.empty:
-        st.info("Nenhum perfil válido encontrado. Use a aba ao lado para adicionar o primeiro!")
+        st.info("Nenhum perfil cadastrado ainda. Vá na aba de gerenciamento ao lado!")
     else:
-        turma_f = st.selectbox("Filtrar por Turma", ["Todas", "Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
-        if turma_f != "Todas":
-            df = df[df["Turma"] == turma_f]
-
-        for _, row in df.iterrows():
-            with st.container():
-                alertas = ""
-                if str(row['Batismo']).strip().upper() == "NÃO": alertas += '<span class="alert-badge">SEM BATISMO</span>'
-                if str(row['Eucaristia']).strip().upper() == "NÃO": alertas += '<span class="alert-badge">SEM 1ª EUCARISTIA</span>'
+        st.markdown("### Selecione quem deseja visualizar:")
+        col_t, col_n = st.columns(2)
+        
+        turma_f = col_t.selectbox("Filtrar por Turma", ["Todas", "Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
+        df_filtrado = df if turma_f == "Todas" else df[df["Turma"] == turma_f]
+        
+        if df_filtrado.empty:
+            st.warning("Nenhum crismando encontrado nesta turma.")
+        else:
+            nome_selecionado = col_n.selectbox("Escolha o Crismando", df_filtrado["Nome"].tolist())
+            row = df_filtrado[df_filtrado["Nome"] == nome_selecionado].iloc[0]
+            
+            # --- CARD DO PERFIL ---
+            st.markdown('<div class="profile-card">', unsafe_allow_html=True)
+            
+            # Exibição da Foto
+            if pd.notna(row['Foto']) and len(str(row['Foto'])) > 100:
+                st.image(f"data:image/jpeg;base64,{row['Foto']}", width=250)
+            else:
+                st.info("👤 Este perfil está sem foto de identificação.")
                 
-                st.markdown(f"""
-                <div class="post-card">
-                    <div class="post-header">
-                        <span>👤 {row['Nome']} ({row['Turma']})</span>
-                        <div>{alertas}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                if pd.notna(row['Foto']) and len(str(row['Foto'])) > 100:
-                    st.image(f"data:image/jpeg;base64,{row['Foto']}", use_container_width=True)
+            st.markdown(f'<div class="profile-name">{row["Nome"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="profile-detail">Membro da <strong>{row["Turma"]}</strong></div>', unsafe_allow_html=True)
+            
+            # Alertas de Sacramentos
+            if str(row['Batismo']).strip().upper() == "NÃO":
+                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM BATISMO</div>', unsafe_allow_html=True)
+            if str(row['Eucaristia']).strip().upper() == "NÃO":
+                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>', unsafe_allow_html=True)
                 
-                presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Média"
-                qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma registrada"
-                defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum registrado"
-
-                st.markdown(f"""
-                <div class="post-card" style="margin-top:-20px; border-top:none;">
-                    <div class="post-content">
-                        <span class="badge">Presença: {presenca_val}</span><br><br>
-                        <strong>✅ Qualidades:</strong> {qualidades_val}<br>
-                        <strong>❌ Defeitos:</strong> {defeitos_val}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+            # Nível de Presença
+            presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Média"
+            st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
+            
+            # Qualidades e Defeitos Formatados
+            qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
+            defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito ou ponto a melhorar registrado."
+            
+            st.markdown('<div class="section-title">✅ Qualidades / Pontos Positivos:</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-content">{qualidades_val}</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="section-title">❌ Defeitos / Pontos a Melhorar:</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-content">{defeitos_val}</div>', unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # --- ABA 2: CADASTRAR OU ATUALIZAR ---
 with aba_gerenciar:
-    st.markdown("### 📝 Salvar Informações")
-    st.caption("Dica: Se você digitar um **Nome** que já existe, o sistema irá atualizar os dados dele automaticamente em vez de criar uma cópia.")
+    st.markdown("### 📝 Cadastrar ou Modificar Perfil")
+    st.caption("Se você digitar ou selecionar um nome que já existe, o sistema atualizará a linha dele na planilha.")
     
     df_lista = carregar_dados()
     nomes_existentes = []
@@ -112,12 +124,11 @@ with aba_gerenciar:
         df_lista = df_lista.dropna(subset=["Nome"])
         nomes_existentes = [n for n in df_lista["Nome"].tolist() if str(n).strip() != ""]
 
-    # Opção de selecionar um nome existente para carregar ou digitar um novo
-    modo = st.radio("Como deseja prosseguir?", ["Digitar um novo nome", "Selecionar um crismando existente para atualizar"])
+    modo = st.radio("Como deseja prosseguir?", ["Criar novo perfil (Digitar)", "Editar um perfil existente (Selecionar)"])
     
     with st.form("form_cadastro", clear_on_submit=True):
-        if modo == "Selecionar um crismando existente para atualizar" and nomes_existentes:
-            nome = st.selectbox("Escolha o Crismando", nomes_existentes)
+        if modo == "Editar um perfil existente (Selecionar)" and nomes_existentes:
+            nome = st.selectbox("Escolha o Crismando para Modificar", nomes_existentes)
         else:
             nome = st.text_input("Nome completo do Crismando *")
             
@@ -128,9 +139,9 @@ with aba_gerenciar:
         batismo = col1.radio("Possui Batismo?", ["Sim", "Não"])
         eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"])
         
-        qualidades = st.text_area("Qualidades (Pontos Positivos)")
-        defeitos = st.text_area("Defeitos (Pontos a melhorar)")
-        foto = st.file_uploader("Foto de Perfil (Opcional ao atualizar)", type=["jpg", "png"])
+        qualidades = st.text_area("Escreva as Qualidades:")
+        defeitos = st.text_area("Escreva os Defeitos:")
+        foto = st.file_uploader("Foto de Perfil (Deixe em branco para manter a atual se estiver editando)", type=["jpg", "png"])
         
         if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
             if not nome or not str(nome).strip():
