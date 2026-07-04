@@ -35,13 +35,23 @@ def carregar_dados():
         response = requests.get(url_planilha_csv)
         if response.status_code == 200:
             df = pd.read_csv(io.StringIO(response.text), dtype=str)
+            
+            # Garante que as colunas existam
             for col in colunas_necessarias:
                 if col not in df.columns:
                     df[col] = ""
+            
+            # Limpa valores nulos clássicos do pandas substituindo por texto vazio
+            df = df.fillna("")
+            
+            # REGRA DE LIMPEZA CRUCIAL: Remove linhas onde o Nome está totalmente em branco
+            if not df.empty:
+                df["Nome_Limpo"] = df["Nome"].astype(str).str.strip()
+                df = df[df["Nome_Limpo"] != ""]
+                df = df[df["Nome_Limpo"].str.lower() != "nan"]
+                df = df.drop(columns=["Nome_Limpo"])
+                
             return df
-        elif response.status_code == 404:
-            st.error("⚠️ **Erro 404: Planilha Privada!** No canto superior direito da Planilha, mude o acesso para 'Qualquer pessoa com o link'.")
-            return pd.DataFrame(columns=colunas_necessarias)
         else:
             return pd.DataFrame(columns=colunas_necessarias)
     except Exception as e:
@@ -67,13 +77,8 @@ aba_perfil, aba_gerenciar = st.tabs(["🔍 Ver Perfil", "⚙️ Cadastrar / Gere
 with aba_perfil:
     df = carregar_dados()
     
-    if not df.empty:
-        df = df.dropna(subset=["Nome"])
-        df = df[df["Nome"].astype(str).str.strip() != ""]
-        df = df[df["Nome"].astype(str).str.contains(r'[a-zA-Z]', na=False)]
-        
     if df.empty:
-        st.info("Nenhum perfil válido carregado. Registre o primeiro membro na aba ao lado.")
+        st.info("Nenhum perfil cadastrado ou disponível no momento.")
     else:
         st.markdown("### Selecione quem deseja visualizar:")
         col_t, col_n = st.columns(2)
@@ -99,7 +104,9 @@ with aba_perfil:
                 st.warning("👤 Perfil sem foto de identificação disponível.")
                 
             st.markdown(f'<div class="profile-name">{row["Nome"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="profile-detail">Membro da <strong>{row["Turma"]}</strong></div>', unsafe_allow_html=True)
+            
+            turma_val = row["Turma"] if str(row["Turma"]).strip() != "" else "Não informada"
+            st.markdown(f'<div class="profile-detail">Membro da <strong>{turma_val}</strong></div>', unsafe_allow_html=True)
             
             if str(row['Batismo']).strip().upper() == "NÃO":
                 st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM BATISMO</div>', unsafe_allow_html=True)
@@ -127,7 +134,6 @@ with aba_gerenciar:
     df_lista = carregar_dados()
     nomes_existentes = []
     if not df_lista.empty:
-        df_lista = df_lista.dropna(subset=["Nome"])
         nomes_existentes = [n for n in df_lista["Nome"].tolist() if str(n).strip() != ""]
 
     modo = st.radio("O que deseja fazer?", ["Criar novo perfil (Digitar)", "Editar perfil existente", "❌ Excluir um perfil"], horizontal=True)
@@ -152,7 +158,7 @@ with aba_gerenciar:
                         if res.status_code == 200:
                             st.success(f"🎉 {res.text}")
                             st.cache_data.clear()
-                            time.sleep(2.0)
+                            time.sleep(1.5)
                             st.rerun()
                         else:
                             st.error(f"Erro do servidor Google: {res.status_code}")
@@ -247,7 +253,7 @@ with aba_gerenciar:
                             if res.status_code == 200:
                                 st.success(f"🎉 {res.text}")
                                 st.cache_data.clear()
-                                time.sleep(2.0)
+                                time.sleep(1.5)
                                 st.rerun()
                             else:
                                 st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
