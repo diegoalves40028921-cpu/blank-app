@@ -159,4 +159,24 @@ with aba_gerenciar:
                 st.error("O campo Nome é obrigatório!")
             else:
                 payload = {
-                    "Nome":
+                    "Nome": str(nome).strip(), 
+                    "Turma": turma, 
+                    "Presenca": presenca,
+                    "Batismo": batismo, 
+                    "Eucaristia": eucaristia,
+                    "Qualidades": qualidades_input, 
+                    "Defeitos": defeitos_input,
+                    "Foto": img_to_base64(foto) if foto else ""
+                }
+                try:
+                    res = requests.post(url_script_google, json=payload)
+                    if res.status_code == 200:
+                        st.success("Dados salvos com sucesso!")
+                        st.cache_data.clear()
+                        st.rerun()
+                    elif res.status_code == 401:
+                        st.error("⚠️ **Erro 401: Não Autorizado!** Volte ao Apps Script e mude 'Quem tem acesso' para 'Qualquer pessoa'.")
+                    else:
+                        st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
+                except Exception as e:
+                    st.error(f"Erro de conexão: {e}")
