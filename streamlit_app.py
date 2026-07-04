@@ -8,7 +8,7 @@ import io
 # Configuração da Página
 st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
 
-# --- ESTILO INSTAGRAM (CSS) ---
+# --- ESTITO INSTAGRAM (CSS) ---
 st.markdown("""
     <style>
     .main { background-color: #FAFAFA; }
@@ -24,7 +24,6 @@ st.markdown("""
         margin-bottom: 25px; padding: 0px; overflow: hidden;
     }
     .post-header { padding: 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #FAFAFA; }
-    .post-img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background-color: #f0f0f0; }
     .post-content { padding: 12px; }
     .badge {
         padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 5px;
@@ -33,7 +32,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONEXÃO COM GOOGLE SHEETS ---
-url = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" # <-- Lembre de colocar o link da sua planilha aqui!
+url = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" # <-- Cole aqui o link da sua planilha!
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -41,7 +40,6 @@ def carregar_dados():
     try:
         return conn.read(spreadsheet=url, usecols=[0,1,2,3,4,5,6,7])
     except Exception:
-        # Cria um esqueleto caso a planilha esteja totalmente vazia
         return pd.DataFrame(columns=["Nome", "Turma", "Presenca", "Notas", "Batismo", "Eucaristia", "ParaTirar", "Foto"])
 
 def img_to_base64(image_file):
@@ -75,7 +73,7 @@ with aba_feed:
             nome_jovem = str(row['Nome'])
             letra_inicial = nome_jovem[0].upper() if nome_jovem else "👤"
             
-            # Topo do Card (Sem f-strings perigosas)
+            # Topo do Card (Sem f-strings puras, usando .format seguro)
             html_header = """
             <div class="post-card">
                 <div class="post-header">
