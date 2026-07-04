@@ -4,7 +4,7 @@ from PIL import Image
 import base64
 import io
 import requests
-import time  # <--- NOVO: Importante para segurar a mensagem na tela!
+import time  # --- Controla o tempo das mensagens na tela ---
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
@@ -12,8 +12,8 @@ st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="center
 # --- LINKS ---
 url_planilha_csv = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/export?format=csv"
 
-# ⚠️ SUBSTITUA O TEXTO ABAIXO PELA SUA URL DO GOOGLE (QUE TERMINA EM /exec)
-url_script_google = "COLE_A_NOVA_URL_AQUI"
+# 🌟 Seu link oficial do Google Apps Script já configurado:
+url_script_google = "https://script.google.com/macros/s/AKfycbyPtxsjXFLO46Y9F9HEoqrtr8WqRxvesZp2qk8hPc_oIj120u6u2S3ULOLzLWLlloVaJg/exec"
 
 # --- ESTILO CSS PARA O PERFIL ---
 st.markdown("""
@@ -75,7 +75,7 @@ with aba_perfil:
         df = df[df["Nome"].astype(str).str.contains(r'[a-zA-Z]', na=False)]
         
     if df.empty:
-        st.info("Nenhum perfil válido carregado. Registe o primeiro membro na aba ao lado.")
+        st.info("Nenhum perfil válido carregado. Registre o primeiro membro na aba ao lado.")
     else:
         st.markdown("### Selecione quem deseja visualizar:")
         col_t, col_n = st.columns(2)
@@ -94,97 +94,4 @@ with aba_perfil:
             
             # Exibição Inteligente da Foto
             foto_string = str(row['Foto']).strip() if pd.notna(row['Foto']) else ""
-            if len(foto_string) > 100:
-                if "data:image" in foto_string:
-                    foto_string = foto_string.split(",")[-1]
-                st.image(f"data:image/jpeg;base64,{foto_string}", width=220)
-            else:
-                st.warning("👤 Perfil sem foto de identificação disponível.")
-                
-            st.markdown(f'<div class="profile-name">{row["Nome"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="profile-detail">Membro da <strong>{row["Turma"]}</strong></div>', unsafe_allow_html=True)
-            
-            # Alertas de Sacramentos
-            if str(row['Batismo']).strip().upper() == "NÃO":
-                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM BATISMO</div>', unsafe_allow_html=True)
-            if str(row['Eucaristia']).strip().upper() == "NÃO":
-                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>', unsafe_allow_html=True)
-                
-            # Nível de Presença
-            presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
-            st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
-            
-            # Qualidades e Defeitos Formatados
-            qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
-            defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
-            
-            st.markdown('<div class="section-title">✅ Qualidades / Pontos Positivos:</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="section-content">{qualidades_val}</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="section-title">❌ Defeitos / Pontos a Melhorar:</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="section-content">{defeitos_val}</div>', unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-
-# --- ABA 2: CADASTRAR OU ATUALIZAR ---
-with aba_gerenciar:
-    st.markdown("### 📝 Cadastrar ou Modificar Perfil")
-    
-    df_lista = carregar_dados()
-    nomes_existentes = []
-    if not df_lista.empty:
-        df_lista = df_lista.dropna(subset=["Nome"])
-        nomes_existentes = [n for n in df_lista["Nome"].tolist() if str(n).strip() != ""]
-
-    modo = st.radio("Como deseja prosseguir?", ["Criar novo perfil (Digitar)", "Editar um perfil existente (Selecionar)"])
-    
-    with st.form("form_cadastro", clear_on_submit=True):
-        if modo == "Editar um perfil existente (Selecionar)" and nomes_existentes:
-            nome = st.selectbox("Escolha o Crismando para Modificar", nomes_existentes)
-        else:
-            nome = st.text_input("Nome completo do Crismando *")
-            
-        turma = st.selectbox("Turma", ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
-        presenca = st.select_slider("Nível de Presença", options=["Baixa", "Média", "Alta"], value="Média")
-        
-        col1, col2 = st.columns(2)
-        batismo = col1.radio("Possui Batismo?", ["Sim", "Não"])
-        eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"])
-        
-        qualidades_input = st.text_area("Escreva as Qualidades:")
-        defeitos_input = st.text_area("Escreva os Defeitos:")
-        foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
-        
-        if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
-            if not nome or not str(nome).strip():
-                st.error("O campo Nome é obrigatório!")
-            elif url_script_google == "COLE_A_NOVA_URL_AQUI":
-                st.error("⚠️ Você esqueceu de substituir 'COLE_A_NOVA_URL_AQUI' pelo link do seu Google Apps Script!")
-            else:
-                payload = {
-                    "Nome": str(nome).strip(), 
-                    "Turma": turma, 
-                    "Presenca": presenca,
-                    "Batismo": batismo, 
-                    "Eucaristia": eucaristia,
-                    "Qualidades": qualidades_input, 
-                    "Defeitos": defeitos_input,
-                    "Foto": img_to_base64(foto) if foto else ""
-                }
-                
-                # Feedback visual de carregamento
-                with st.spinner("Enviando dados para a Planilha Google..."):
-                    try:
-                        res = requests.post(url_script_google, json=payload)
-                        if res.status_code == 200:
-                            st.success("🎉 Dados salvos com sucesso no Google Sheets!")
-                            st.cache_data.clear()
-                            time.sleep(2.0)  # NOVO: Dá 2 segundos para você ver o aviso de sucesso!
-                            st.rerun()
-                        elif res.status_code == 401:
-                            st.error("⚠️ **Erro 401: Não Autorizado!** Volte ao Apps Script e mude 'Quem tem acesso' para 'Qualquer pessoa'.")
-                        else:
-                            st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
-                            st.info(f"Resposta técnica: {res.text}")
-                    except Exception as e:
-                        st.error(f"Erro de conexão com o script: {e}")
+            if len(foto_string) > 10
