@@ -16,7 +16,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {
         background-color: #EFEFEF; border-radius: 4px; padding: 10px 20px; font-weight: bold;
     }
-    .stTabs [aria-selected="true"] { background-color: #0095F6 !class; color: white !important; }
+    .stTabs [aria-selected="true"] { background-color: #0095F6 !important; color: white !important; }
     
     /* Card do Post */
     .post-card {
@@ -33,19 +33,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONEXÃO COM GOOGLE SHEETS ---
-# No Streamlit Cloud, você colará o link da planilha nos "Secrets"
-url = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" # Substitua pelo seu link
+url = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" # <-- Lembre de colocar o link da sua planilha aqui!
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
-    return conn.read(spreadsheet=url, usecols=[0,1,2,3,4,5,6,7])
+    try:
+        return conn.read(spreadsheet=url, usecols=[0,1,2,3,4,5,6,7])
+    except Exception:
+        # Cria um esqueleto caso a planilha esteja totalmente vazia
+        return pd.DataFrame(columns=["Nome", "Turma", "Presenca", "Notas", "Batismo", "Eucaristia", "ParaTirar", "Foto"])
 
-# Função para converter imagem para texto (para salvar na planilha)
 def img_to_base64(image_file):
     if image_file:
         img = Image.open(image_file)
-        img = img.resize((400, 400)) # Otimiza o tamanho
+        img = img.resize((400, 400)) 
         buffered = io.BytesIO()
         img.save(buffered, format="JPEG", quality=70)
         return base64.b64encode(buffered.getvalue()).decode()
@@ -60,54 +62,67 @@ aba_feed, aba_novo = st.tabs(["🏠 Feed de Membros", "➕ Criar Novo Perfil"])
 with aba_feed:
     df = carregar_dados()
     
-    filtro_turma = st.selectbox("🔍 Filtrar Turma:", ["Todas"] + sorted(df['Turma'].unique().tolist()))
-    
-    for index, row in df.iterrows():
-        if filtro_turma != "Todas" and row['Turma'] != filtro_turma:
-            continue
+    if df.empty:
+        st.info("Nenhum perfil publicado ainda. Vá na aba 'Criar Novo Perfil'!")
+    else:
+        turmas_disponiveis = ["Todas"] + sorted(df['Turma'].dropna().unique().tolist())
+        filtro_turma = st.selectbox("🔍 Filtrar Turma:", turmas_disponiveis)
+        
+        for index, row in df.iterrows():
+            if filtro_turma != "Todas" and row['Turma'] != filtro_turma:
+                continue
+                
+            nome_jovem = str(row['Nome'])
+            letra_inicial = nome_jovem[0].upper() if nome_jovem else "👤"
             
-        # HTML do Card Estilo Instagram
-        st.markdown(f"""
+            # Topo do Card (Sem f-strings perigosas)
+            html_header = """
             <div class="post-card">
                 <div class="post-header">
                     <div style="width: 32px; height: 32px; background: #E1306C; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
-                        {row['Nome'][0]}
+                        {}
                     </div>
-                    <div style="font-weight: bold; color: #262626;">{row['Nome']}</div>
+                    <div style="font-weight: bold; color: #262626;">{}</div>
                 </div>
-        """, unsafe_allow_html=True)
-        
-        # Exibir Foto Real ou Placeholder
-        if row['Foto'] and len(str(row['Foto'])) > 100:
-            st.image(f"data:image/jpeg;base64,{row['Foto']}", use_column_width=True)
-        else:
-            st.markdown('<div style="width: 100%; height: 300px; background: #fafafa; display: flex; align-items: center; justify-content: center; color: #ccc;">Sem Foto</div>', unsafe_allow_html=True)
+            """.format(letra_inicial, nome_jovem)
+            st.markdown(html_header, unsafe_allow_html=True)
             
-        # Conteúdo do Card
-        status_batismo = "✅ Batizado" if row['Batismo'] else "❌ Sem Batismo"
-        status_euca = "✅ 1ª Comunhão" if row['Eucaristia'] else "❌ Sem Eucaristia"
-        cor_aviso = "#ED4956" if row['ParaTirar'] else "#ffffff"
-        
-        st.markdown(f"""
+            # Imagem do Card
+            foto_salva = row['Foto']
+            if pd.notna(foto_salva) and len(str(foto_salva)) > 100:
+                st.image("data:image/jpeg;base64," + str(foto_salva), use_column_width=True)
+            else:
+                st.markdown('<div style="width: 100%; height: 300px; background: #fafafa; display: flex; align-items: center; justify-content: center; color: #ccc;">Sem Foto</div>', unsafe_allow_html=True)
+                
+            # Detalhes do Card
+            status_batismo = "✅ Batizado" if row['Batismo'] else "❌ Sem Batismo"
+            status_euca = "✅ 1ª Comunhão" if row['Eucaristia'] else "❌ Sem Eucaristia"
+            aviso_afastamento = "<div style='color: #ED4956; font-weight: bold; font-size: 12px; margin-top: 5px;'>⚠️ SOLICITADO AFASTAR</div>" if row['ParaTirar'] else ""
+            
+            html_content = """
                 <div class="post-content">
                     <div style="margin-bottom: 8px;">
-                        <span class="badge" style="background: #EFEFEF; color: #262626;">{row['Turma']}</span>
-                        <span class="badge" style="background: #0095F6; color: white;">{row['Presenca']}</span>
+                        <span class="badge" style="background: #EFEFEF; color: #262626;">{}</span>
+                        <span class="badge" style="background: #0095F6; color: white;">{}</span>
                     </div>
                     <div style="color: #262626; font-size: 14px; margin-bottom: 8px;">
-                        <b>{row['Nome']}</b> {row['Notas']}
+                        <b>{}</b> {}
                     </div>
                     <div style="font-size: 12px; color: #8E8E8E;">
-                        {status_batismo} • {status_euca}
+                        {} • {}
                     </div>
-                    {"<div style='color: #ED4956; font-weight: bold; font-size: 12px; margin-top: 5px;'>⚠️ SOLICITADO AFASTAR</div>" if row['ParaTirar'] else ""}
+                    {}
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+            """.format(row['Turma'], row['Presenca'], nome_jovem, row['Notas'], status_batismo, status_euca, aviso_afastamento)
+            
+            st.markdown(html_content, unsafe_allow_html=True)
 
 # --- ABA 2: CADASTRO ---
 with aba_novo:
     st.subheader("Publicar Novo Perfil")
+    
+    df_atual = carregar_dados()
     
     with st.form("form_registro", clear_on_submit=True):
         nome = st.text_input("Nome Completo")
@@ -126,7 +141,6 @@ with aba_novo:
             if nome:
                 foto_base64 = img_to_base64(arquivo_foto)
                 
-                # Criar nova linha
                 nova_linha = pd.DataFrame([{
                     "Nome": nome,
                     "Turma": turma,
@@ -138,11 +152,11 @@ with aba_novo:
                     "Foto": foto_base64
                 }])
                 
-                # Atualizar Planilha
-                df_atualizado = pd.concat([df, nova_linha], ignore_index=True)
+                df_atualizado = pd.concat([df_atual, nova_linha], ignore_index=True)
                 conn.update(spreadsheet=url, data=df_atualizado)
                 
                 st.success("Perfil publicado com sucesso!")
+                st.author_recurrent = True
                 st.rerun()
             else:
                 st.error("Por favor, preencha o nome.")
