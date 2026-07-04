@@ -9,9 +9,9 @@ import time
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Gerenciador de Jovens da Crisma", page_icon="🕊️", layout="centered")
 
-# --- LINKS ---
+# --- LINKS (ATUALIZADO COM O SEU NOVO SCRIPT) ---
 url_planilha_csv = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/export?format=csv"
-url_script_google = "https://script.google.com/macros/s/AKfycbyPtxsjXFLO46Y9F9HEoqrtr8WqRxvesZp2qk8hPc_oIj120u6u2S3ULOLzLWLlloVaJg/exec"
+url_script_google = "https://script.google.com/macros/s/AKfycbwex6IBKOW418weukD9wdLlHVEA5fNXJkTGn2LwCF3TG1U9Dh0oMpTwVPA7Fnyk_XKvnA/exec"
 
 # --- ESTILO CSS PARA O PERFIL ---
 st.markdown("""
@@ -36,15 +36,12 @@ def carregar_dados():
         if response.status_code == 200:
             df = pd.read_csv(io.StringIO(response.text), dtype=str)
             
-            # Garante que as colunas existam
             for col in colunas_necessarias:
                 if col not in df.columns:
                     df[col] = ""
             
-            # Limpa valores nulos clássicos do pandas substituindo por texto vazio
             df = df.fillna("")
             
-            # REGRA DE LIMPEZA CRUCIAL: Remove linhas onde o Nome está totalmente em branco
             if not df.empty:
                 df["Nome_Limpo"] = df["Nome"].astype(str).str.strip()
                 df = df[df["Nome_Limpo"] != ""]
