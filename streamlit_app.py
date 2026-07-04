@@ -8,7 +8,7 @@ import io
 # Configuração da Página
 st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
 
-# --- ESTITO INSTAGRAM (CSS) ---
+# --- ESTILO INSTAGRAM (CSS) ---
 st.markdown("""
     <style>
     .main { background-color: #FAFAFA; }
@@ -32,14 +32,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONEXÃO COM GOOGLE SHEETS ---
-url = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" # <-- Cole aqui o link da sua planilha!
+# Cole abaixo o link completo da sua planilha Google
+url_planilha = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" 
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
     try:
-        return conn.read(spreadsheet=url, usecols=[0,1,2,3,4,5,6,7])
+        return conn.read(spreadsheet=url_planilha)
     except Exception:
+        # Se der erro ou estiver vazia, cria a estrutura básica
         return pd.DataFrame(columns=["Nome", "Turma", "Presenca", "Notas", "Batismo", "Eucaristia", "ParaTirar", "Foto"])
 
 def img_to_base64(image_file):
@@ -60,9 +62,12 @@ aba_feed, aba_novo = st.tabs(["🏠 Feed de Membros", "➕ Criar Novo Perfil"])
 with aba_feed:
     df = carregar_dados()
     
-    if df.empty:
+    if df.empty or "Nome" not in df.columns:
         st.info("Nenhum perfil publicado ainda. Vá na aba 'Criar Novo Perfil'!")
     else:
+        # Remove linhas em branco se houver
+        df = df.dropna(subset=["Nome"])
+        
         turmas_disponiveis = ["Todas"] + sorted(df['Turma'].dropna().unique().tolist())
         filtro_turma = st.selectbox("🔍 Filtrar Turma:", turmas_disponiveis)
         
@@ -73,48 +78,46 @@ with aba_feed:
             nome_jovem = str(row['Nome'])
             letra_inicial = nome_jovem[0].upper() if nome_jovem else "👤"
             
-            # Topo do Card (Sem f-strings puras, usando .format seguro)
-            html_header = """
+            # Cabeçalho do card
+            st.markdown(f"""
             <div class="post-card">
                 <div class="post-header">
                     <div style="width: 32px; height: 32px; background: #E1306C; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
-                        {}
+                        {letra_inicial}
                     </div>
-                    <div style="font-weight: bold; color: #262626;">{}</div>
+                    <div style="font-weight: bold; color: #262626;">{nome_jovem}</div>
                 </div>
-            """.format(letra_inicial, nome_jovem)
-            st.markdown(html_header, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
             
-            # Imagem do Card
-            foto_salva = row['Foto']
+            # Foto do card
+            foto_salva = row.get('Foto', "")
             if pd.notna(foto_salva) and len(str(foto_salva)) > 100:
-                st.image("data:image/jpeg;base64," + str(foto_salva), use_column_width=True)
+                st.image("data:image/jpeg;base64," + str(foto_salva), use_container_width=True)
             else:
                 st.markdown('<div style="width: 100%; height: 300px; background: #fafafa; display: flex; align-items: center; justify-content: center; color: #ccc;">Sem Foto</div>', unsafe_allow_html=True)
                 
-            # Detalhes do Card
-            status_batismo = "✅ Batizado" if row['Batismo'] else "❌ Sem Batismo"
-            status_euca = "✅ 1ª Comunhão" if row['Eucaristia'] else "❌ Sem Eucaristia"
-            aviso_afastamento = "<div style='color: #ED4956; font-weight: bold; font-size: 12px; margin-top: 5px;'>⚠️ SOLICITADO AFASTAR</div>" if row['ParaTirar'] else ""
+            # Detalhes e status do crismando
+            status_batismo = "✅ Batizado" if row.get('Batismo') else "❌ Sem Batismo"
+            status_euca = "✅ 1ª Comunhão" if row.get('Eucaristia') else "❌ Sem Eucaristia"
             
-            html_content = """
+            st.markdown(f"""
                 <div class="post-content">
                     <div style="margin-bottom: 8px;">
-                        <span class="badge" style="background: #EFEFEF; color: #262626;">{}</span>
-                        <span class="badge" style="background: #0095F6; color: white;">{}</span>
+                        <span class="badge" style="background: #EFEFEF; color: #262626;">{row.get('Turma', 'Sem Turma')}</span>
+                        <span class="badge" style="background: #0095F6; color: white;">{row.get('Presenca', 'Normal')}</span>
                     </div>
                     <div style="color: #262626; font-size: 14px; margin-bottom: 8px;">
-                        <b>{}</b> {}
+                        <b>{nome_jovem}</b> {row.get('Notas', '')}
                     </div>
                     <div style="font-size: 12px; color: #8E8E8E;">
-                        {} • {}
+                        {status_batismo} • {status_euca}
                     </div>
-                    {}
-                </div>
-            </div>
-            """.format(row['Turma'], row['Presenca'], nome_jovem, row['Notas'], status_batismo, status_euca, aviso_afastamento)
+            """, unsafe_allow_html=True)
             
-            st.markdown(html_content, unsafe_allow_html=True)
+            if row.get('ParaTirar'):
+                st.markdown("<div style='color: #ED4956; font-weight: bold; font-size: 12px; margin-top: 5px;'>⚠️ SOLICITADO AFASTAR</div>", unsafe_allow_html=True)
+                
+            st.markdown("</div></div>", unsafe_allow_html=True)
 
 # --- ABA 2: CADASTRO ---
 with aba_novo:
@@ -151,10 +154,9 @@ with aba_novo:
                 }])
                 
                 df_atualizado = pd.concat([df_atual, nova_linha], ignore_index=True)
-                conn.update(spreadsheet=url, data=df_atualizado)
+                conn.update(spreadsheet=url_planilha, data=df_atualizado)
                 
                 st.success("Perfil publicado com sucesso!")
-                st.author_recurrent = True
                 st.rerun()
             else:
                 st.error("Por favor, preencha o nome.")
