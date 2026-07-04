@@ -75,13 +75,4 @@ with aba_perfil:
     if df.empty:
         st.info("Nenhum perfil válido carregado. Registre o primeiro membro na aba ao lado.")
     else:
-        st.markdown("### Selecione quem deseja visualizar:")
-        col_t, col_n = st.columns(2)
-        
-        turma_f = col_t.selectbox("Filtrar por Turma", ["Todas", "Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
-        df_filtrado = df if turma_f == "Todas" else df[df["Turma"] == turma_f]
-        
-        if df_filtrado.empty:
-            st.warning("Nenhum crismando encontrado nesta turma.")
-        else:
-            nome_selecionado = col_n.selectbox("Escolha o Crismando", df_filtrado["Nome
+        st.markdown("### Selecione quem deseja
