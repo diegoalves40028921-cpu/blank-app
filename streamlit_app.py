@@ -91,3 +91,13 @@ with aba_feed:
 # --- ABA 2: NOVO PERFIL ---
 with aba_novo:
     with st.form("novo_p"):
+        nome = st.text_input("Nome completo")
+        turma = st.selectbox("Turma", ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
+        presenca = st.select_slider("Nível de Presença", options=["Baixa", "Média", "Alta"])
+        
+        col1, col2 = st.columns(2)
+        batismo = col1.radio("Possui Batismo?", ["Sim", "Não"])
+        eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"])
+        
+        qualidades = st.text_area("Qualidades (Pontos Positivos)")
+        defeitos
