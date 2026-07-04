@@ -1,119 +1,148 @@
 import streamlit as st
-import json
-import os
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+from PIL import Image
+import base64
+import io
 
-# Configuração inicial da página estilo Aplicativo de Celular
-st.set_page_config(
-    page_title="CrismaGram Pro",
-    page_icon="📸",
-    layout="centered"
-)
+# Configuração da Página
+st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
 
-# Estilização customizada para parecer o Instagram
+# --- ESTILO INSTAGRAM (CSS) ---
 st.markdown("""
     <style>
     .main { background-color: #FAFAFA; }
-    div[data-testid="stBlock"] {
-        background-color: white;
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid #DBDBDB;
-        margin-bottom: 15px;
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #EFEFEF; border-radius: 4px; padding: 10px 20px; font-weight: bold;
     }
-    .stButton>button {
-        background-color: #0095F6;
-        color: white;
-        border-radius: 8px;
-        width: 100%;
-        font-weight: bold;
+    .stTabs [aria-selected="true"] { background-color: #0095F6 !class; color: white !important; }
+    
+    /* Card do Post */
+    .post-card {
+        background-color: white; border: 1px solid #DBDBDB; border-radius: 8px;
+        margin-bottom: 25px; padding: 0px; overflow: hidden;
+    }
+    .post-header { padding: 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #FAFAFA; }
+    .post-img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background-color: #f0f0f0; }
+    .post-content { padding: 12px; }
+    .badge {
+        padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Inicializar banco de dados temporário na memória compartilhada
-if "dados_crismandos" not in st.session_state:
-    st.session_state.dados_crismandos = [
-        {
-            "Nome": "Exemplo de Jovem",
-            "Turma": "Turma 1",
-            "Presenca": "Médio",
-            "Notas": "Bem-vindo ao CrismaGram! Edite ou adicione novos perfis.",
-            "Batismo": True,
-            "Eucaristia": False,
-            "ParaTirar": False
-        }
-    ]
+# --- CONEXÃO COM GOOGLE SHEETS ---
+# No Streamlit Cloud, você colará o link da planilha nos "Secrets"
+url = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE" # Substitua pelo seu link
 
-# --- TOPO ESTILO INSTAGRAM ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+def carregar_dados():
+    return conn.read(spreadsheet=url, usecols=[0,1,2,3,4,5,6,7])
+
+# Função para converter imagem para texto (para salvar na planilha)
+def img_to_base64(image_file):
+    if image_file:
+        img = Image.open(image_file)
+        img = img.resize((400, 400)) # Otimiza o tamanho
+        buffered = io.BytesIO()
+        img.save(buffered, format="JPEG", quality=70)
+        return base64.b64encode(buffered.getvalue()).decode()
+    return ""
+
+# --- INTERFACE ---
 st.title("📸 CrismaGram")
-st.caption("Gestão Unificada de Crismandos para Catequistas")
 
-# Criação de Abas no Topo
-aba_feed, aba_novo = st.tabs(["🏠 Feed de Perfis", "➕ Criar Novo Perfil"])
+aba_feed, aba_novo = st.tabs(["🏠 Feed de Membros", "➕ Criar Novo Perfil"])
 
-# --- ABA 1: FEED DE PERFIS ---
+# --- ABA 1: FEED ---
 with aba_feed:
-    # Filtro por turma
-    filtro = st.selectbox("Filtrar por Turma:", ["Todas", "Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
+    df = carregar_dados()
     
-    # Renderização dos Cards
-    for idx, j in enumerate(st.session_state.dados_crismandos):
-        if filtro != "Todas" and j["Turma"] != filtro:
+    filtro_turma = st.selectbox("🔍 Filtrar Turma:", ["Todas"] + sorted(df['Turma'].unique().tolist()))
+    
+    for index, row in df.iterrows():
+        if filtro_turma != "Todas" and row['Turma'] != filtro_turma:
             continue
             
-        with st.container():
-            col1, col2 = st.columns([1, 4])
+        # HTML do Card Estilo Instagram
+        st.markdown(f"""
+            <div class="post-card">
+                <div class="post-header">
+                    <div style="width: 32px; height: 32px; background: #E1306C; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                        {row['Nome'][0]}
+                    </div>
+                    <div style="font-weight: bold; color: #262626;">{row['Nome']}</div>
+                </div>
+        """, unsafe_allow_html=True)
+        
+        # Exibir Foto Real ou Placeholder
+        if row['Foto'] and len(str(row['Foto'])) > 100:
+            st.image(f"data:image/jpeg;base64,{row['Foto']}", use_column_width=True)
+        else:
+            st.markdown('<div style="width: 100%; height: 300px; background: #fafafa; display: flex; align-items: center; justify-content: center; color: #ccc;">Sem Foto</div>', unsafe_allow_html=True)
             
-            with col1:
-                st.write("# 👤") # Avatar temporário padrão web
-                
-            with col2:
-                st.subheader(j["Nome"])
-                st.write(f"**{j['Turma']}** • Frequência: {j['Presenca']}")
-                st.write(f"_{j['Notas']}_")
-                
-                # Badges de Sacramentos
-                status_b = "✅ Batizado" if j["Batismo"] else "❌ Sem Batismo"
-                status_e = "✅ 1ª Comunhão" if j["Eucaristia"] else "❌ Sem Eucaristia"
-                st.write(f"{status_b}  |  {status_e}")
-                
-                if j["ParaTirar"]:
-                    st.warning("⚠️ Solicitado Afastamento")
-                
-                # Botão para remover perfil
-                if st.button("🗑️ Excluir", key=f"del_{idx}"):
-                    st.session_state.dados_crismandos.pop(idx)
-                    st.rerun()
+        # Conteúdo do Card
+        status_batismo = "✅ Batizado" if row['Batismo'] else "❌ Sem Batismo"
+        status_euca = "✅ 1ª Comunhão" if row['Eucaristia'] else "❌ Sem Eucaristia"
+        cor_aviso = "#ED4956" if row['ParaTirar'] else "#ffffff"
+        
+        st.markdown(f"""
+                <div class="post-content">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="background: #EFEFEF; color: #262626;">{row['Turma']}</span>
+                        <span class="badge" style="background: #0095F6; color: white;">{row['Presenca']}</span>
+                    </div>
+                    <div style="color: #262626; font-size: 14px; margin-bottom: 8px;">
+                        <b>{row['Nome']}</b> {row['Notas']}
+                    </div>
+                    <div style="font-size: 12px; color: #8E8E8E;">
+                        {status_batismo} • {status_euca}
+                    </div>
+                    {"<div style='color: #ED4956; font-weight: bold; font-size: 12px; margin-top: 5px;'>⚠️ SOLICITADO AFASTAR</div>" if row['ParaTirar'] else ""}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-# --- ABA 2: CADASTRO DE NOVOS MEMBROS ---
+# --- ABA 2: CADASTRO ---
 with aba_novo:
-    st.subheader("Nova Publicação de Perfil")
+    st.subheader("Publicar Novo Perfil")
     
-    with st.form("cadastro_jovem", clear_on_submit=True):
-        nome = st.text_input("Nome Completo:")
-        turma = st.selectbox("Escolha a Turma:", ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
-        presenca = selectbox_presenca = st.selectbox("Frequência:", ["Muito Presente", "Médio", "Pouco Presente"])
-        notas = st.text_input("Biografia / Notas do Jovem:")
+    with st.form("form_registro", clear_on_submit=True):
+        nome = st.text_input("Nome Completo")
+        turma = st.selectbox("Turma", ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
+        presenca = st.selectbox("Frequência", ["Muito Presente", "Médio", "Pouco Presente"])
+        notas = st.text_area("Biografia / Notas")
         
-        batismo = st.checkbox("Já possui Batismo")
-        eucaristia = st.checkbox("Já possui 1ª Comunhão")
-        tirar = st.checkbox("Marcar para Afastamento")
+        col_b, col_e, col_t = st.columns(3)
+        batismo = col_b.checkbox("Batizado")
+        eucaristia = col_e.checkbox("1ª Comunhão")
+        tirar = col_t.checkbox("⚠️ Afastar")
         
-        enviado = st.form_submit_button("Publicar Perfil")
+        arquivo_foto = st.file_uploader("📷 Carregar Foto do Crismando", type=["jpg", "png", "jpeg"])
         
-        if enviado:
-            if not nome:
-                st.error("O nome é obrigatório!")
-            else:
-                novo = {
+        if st.form_submit_button("Publicar Perfil"):
+            if nome:
+                foto_base64 = img_to_base64(arquivo_foto)
+                
+                # Criar nova linha
+                nova_linha = pd.DataFrame([{
                     "Nome": nome,
                     "Turma": turma,
                     "Presenca": presenca,
-                    "Notas": text_notas if (text_notas := notas) else "Sem biografia.",
+                    "Notas": notas,
                     "Batismo": batismo,
                     "Eucaristia": eucaristia,
-                    "ParaTirar": tirar
-                }
-                st.session_state.dados_crismandos.append(novo)
-                st.success("Perfil publicado com sucesso! Vá para a aba 'Feed de Perfis'.")
+                    "ParaTirar": tirar,
+                    "Foto": foto_base64
+                }])
+                
+                # Atualizar Planilha
+                df_atualizado = pd.concat([df, nova_linha], ignore_index=True)
+                conn.update(spreadsheet=url, data=df_atualizado)
+                
+                st.success("Perfil publicado com sucesso!")
                 st.rerun()
+            else:
+                st.error("Por favor, preencha o nome.")
