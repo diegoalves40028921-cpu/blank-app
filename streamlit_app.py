@@ -6,17 +6,17 @@ import base64
 import io
 import requests
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
+# --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
 
-# --- CONFIGURAÇÕES DE LINKS ---
-# 1. Cole aqui o link normal de visualização da sua planilha
+# --- 2. CONFIGURAÇÕES DE LINKS ---
+# Substitua pela URL real de visualização da sua planilha pública
 url_planilha = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE"
 
-# 2. Sua URL do App da Web (Script do Google) já configurada!
+# Sua URL do App da Web (Script do Google) para receber os novos dados
 url_script_google = "https://script.google.com/macros/s/AKfycbzMq22vbopzFdvVD6gfliJu9McSAJetnmbEd_YxerKkJtuM4Fl9jwiKDUiUqug4gvhI4Q/exec"
 
-# --- ESTILO INSTAGRAM (CSS) ---
+# --- 3. ESTILO INSTAGRAM (CSS) ---
 st.markdown("""
     <style>
     .main { background-color: #FAFAFA; }
@@ -40,10 +40,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONEXÃO G-SHEETS ---
+# --- 4. CONEXÃO E CACHE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Define tempo de vida do cache para 60 segundos
 @st.cache_data(ttl=60)
 def carregar_dados():
     try:
@@ -53,11 +52,10 @@ def carregar_dados():
         st.error(f"Erro ao carregar planilha: {e}")
         return pd.DataFrame(columns=["Nome", "Turma", "Presenca", "Notas", "Batismo", "Eucaristia", "ParaTirar", "Foto"])
 
-# --- FUNÇÃO DE TRATAMENTO DE FOTO (JPEG + PNG) ---
+# --- 5. FUNÇÕES AUXILIARES ---
 def img_to_base64(image_file):
     if image_file:
         img = Image.open(image_file)
-        # Lida com transparência (PNG) convertendo fundo para branco
         if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
             background = Image.new("RGB", img.size, (255, 255, 255))
             background.paste(img, mask=img.convert("RGBA").split()[3])
@@ -71,7 +69,7 @@ def img_to_base64(image_file):
         return base64.b64encode(buffered.getvalue()).decode()
     return ""
 
-# --- INTERFACE ---
+# --- 6. INTERFACE PRINCIPAL ---
 st.title("📸 CrismaGram")
 
 aba_feed, aba_novo = st.tabs(["🏠 Feed de Membros", "➕ Criar Novo Perfil"])
@@ -89,7 +87,6 @@ with aba_feed:
     if df.empty or "Nome" not in df.columns:
         st.info("Nenhum perfil publicado ainda. Vá na aba 'Criar Novo Perfil'!")
     else:
-        # Limpa dados vazios e prepara os filtros
         df = df.dropna(subset=["Nome"])
         turmas_disponiveis = ["Todas"] + sorted(df['Turma'].dropna().astype(str).unique().tolist())
         
@@ -101,12 +98,12 @@ with aba_feed:
         if df.empty:
             st.warning("Nenhum perfil encontrado para esta turma.")
             
-        # Renderiza o Feed
         for index, row in df.iterrows():
             nome = row.get("Nome", "Sem Nome")
             turma = row.get("Turma", "-")
             foto_b64 = row.get("Foto", "")
             
+            # Cabeçalho do Card
             st.markdown(f"""
             <div class="post-card">
                 <div class="post-header">
@@ -115,7 +112,7 @@ with aba_feed:
             </div>
             """, unsafe_allow_html=True)
             
-            # Exibe a imagem se existir
+            # Imagem do Card
             if pd.notna(foto_b64) and foto_b64.strip() != "":
                 try:
                     st.image(f"data:image/jpeg;base64,{foto_b64}", use_container_width=True)
@@ -124,7 +121,7 @@ with aba_feed:
             else:
                 st.info("Sem foto de perfil.")
             
-            # Exibe o conteúdo abaixo da imagem
+            # Rodapé/Conteúdo do Card
             st.markdown(f"""
             <div class="post-card" style="margin-top: -25px; border-top: none; border-top-left-radius: 0; border-top-right-radius: 0;">
                 <div class="post-content">
@@ -164,10 +161,8 @@ with aba_novo:
                 st.error("Os campos Nome e Turma são obrigatórios!")
             else:
                 with st.spinner("Processando e enviando dados..."):
-                    # Converte a foto em string base64 se existir
                     foto_string = img_to_base64(foto_upload) if foto_upload else ""
                     
-                    # Monta o pacote de dados (JSON) que vai para o Google Script
                     payload = {
                         "Nome": nome_input,
                         "Turma": turma_input,
@@ -180,11 +175,10 @@ with aba_novo:
                     }
                     
                     try:
-                        # Envia os dados via POST para a URL do Google Script
                         resposta = requests.post(url_script_google, json=payload)
                         if resposta.status_code == 200:
                             st.success("Perfil publicado com sucesso!")
-                            st.cache_data.clear() # Limpa o cache para mostrar o novo perfil
+                            st.cache_data.clear()
                         else:
                             st.error(f"Erro ao salvar. Código HTTP: {resposta.status_code}")
                     except Exception as e:
