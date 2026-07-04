@@ -46,24 +46,19 @@ def carregar_dados():
 # --- FUNÇÃO DE TRATAMENTO DE FOTO (JPEG + PNG) ---
 def img_to_base64(image_file):
     if image_file:
-        # Abre a imagem enviada (pode ser PNG, JPEG, etc.)
         img = Image.open(image_file)
         
-        # Se a imagem tiver transparência (comum em PNG), removemos para não dar erro no JPEG
+        # Se a imagem tiver transparência (comum em PNG), adiciona fundo branco
         if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
-            # Cria um fundo branco do mesmo tamanho da imagem
             background = Image.new("RGB", img.size, (255, 255, 255))
-            # Cola a imagem por cima do fundo branco usando a própria transparência como máscara
             background.paste(img, mask=img.convert("RGBA").split()[3])
             img = background
         elif img.mode != "RGB":
-            # Converte outros formatos de cores comuns para RGB padrão
             img = img.convert("RGB")
             
-        # Redimensiona a foto para um quadrado perfeito (estilo Instagram) e otimiza o peso
+        # Redimensiona para um quadrado perfeito otimizado
         img = img.resize((400, 400)) 
         
-        # Transforma a imagem processada em texto seguro para guardar na planilha
         buffered = io.BytesIO()
         img.save(buffered, format="JPEG", quality=75)
         return base64.b64encode(buffered.getvalue()).decode()
@@ -146,4 +141,32 @@ with aba_novo:
         col_b, col_e, col_t = st.columns(3)
         batismo = col_b.checkbox("Batizado")
         eucaristia = col_e.checkbox("1ª Comunhão")
-        tirar
+        tirar = col_t.checkbox("⚠️ Afastar")
+        
+        arquivo_foto = st.file_uploader("📷 Carregar Foto do Crismando", type=["jpg", "png", "jpeg", "webp"])
+        
+        botao_enviar = st.form_submit_button("Publicar Perfil")
+        
+    # Processamento fora do escopo do form (Evita o erro de Submit Button)
+    if botao_enviar:
+        if nome:
+            foto_base64 = img_to_base64(arquivo_foto)
+            
+            nova_linha = pd.DataFrame([{
+                "Nome": nome,
+                "Turma": turma,
+                "Presenca": presenca,
+                "Notas": notas,
+                "Batismo": batismo,
+                "Eucaristia": eucaristia,
+                "ParaTirar": tirar,
+                "Foto": foto_base64
+            }])
+            
+            df_atualizado = pd.concat([df_atual, nova_linha], ignore_index=True)
+            conn.update(spreadsheet=url_planilha, data=df_atualizado)
+            
+            st.success("Perfil publicado com sucesso!")
+            st.rerun()
+        else:
+            st.error("Por favor, preencha o nome.")
