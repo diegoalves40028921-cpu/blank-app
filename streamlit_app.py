@@ -134,29 +134,84 @@ with aba_gerenciar:
         df_lista = df_lista.dropna(subset=["Nome"])
         nomes_existentes = [n for n in df_lista["Nome"].tolist() if str(n).strip() != ""]
 
-    modo = st.radio("Como deseja prosseguir?", ["Criar novo perfil (Digitar)", "Editar um perfil existente (Selecionar)"])
+    modo = st.radio("Como deseja prosseguir?", ["Criar novo perfil (Digitar)", "Editar um perfil existente (Selecionar)"], horizontal=True)
     
+    # --- VARIÁVEIS PADRÃO PARA O FORMULÁRIO (ZERA TUDO CASO SEJA NOVO) ---
+    val_nome = ""
+    val_turma = "Turma 1"
+    val_presenca = "Média"
+    val_batismo = "Sim"
+    val_eucaristia = "Sim"
+    val_qualidades = ""
+    val_defeitos = ""
+    val_foto_atual = ""
+    
+    # Se escolher Editar e existirem nomes, buscamos os dados atuais na planilha
+    if modo == "Editar um perfil existente (Selecionar)" and nomes_existentes:
+        nome_editado = st.selectbox("Escolha o Crismando para Modificar", nomes_existentes)
+        val_nome = nome_editado
+        
+        # Filtra a linha correspondente na planilha
+        dados_usuario = df_lista[df_lista["Nome"] == nome_editado].iloc[0]
+        
+        # Atribui os valores antigos às variáveis para preencher o formulário abaixo
+        lista_turmas = ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"]
+        val_turma = dados_usuario["Turma"] if dados_usuario["Turma"] in lista_turmas else "Turma 1"
+        
+        lista_presenca = ["Baixa", "Média", "Alta"]
+        val_presenca = dados_usuario["Presenca"] if dados_usuario["Presenca"] in lista_presenca else "Média"
+        
+        val_batismo = "Não" if str(dados_usuario["Batismo"]).strip().upper() == "NÃO" else "Sim"
+        val_eucaristia = "Não" if str(dados_usuario["Eucaristia"]).strip().upper() == "NÃO" else "Sim"
+        
+        val_qualidades = str(dados_usuario["Qualidades"]) if pd.notna(dados_usuario["Qualidades"]) and str(dados_usuario["Qualidades"]).strip() != "nan" else ""
+        val_defeitos = str(dados_usuario["Defeitos"]) if pd.notna(dados_usuario["Defeitos"]) and str(dados_usuario["Defeitos"]).strip() != "nan" else ""
+        val_foto_atual = str(dados_usuario["Foto"]).strip() if pd.notna(dados_usuario["Foto"]) else ""
+
+    # --- FORMULÁRIO DE CADASTRO/EDIÇÃO ---
     with st.form("form_cadastro", clear_on_submit=True):
-        if modo == "Editar um perfil existente (Selecionar)" and nomes_existentes:
-            nome = st.selectbox("Escolha o Crismando para Modificar", nomes_existentes)
+        if modo != "Editar um perfil existente (Selecionar)" or not nomes_existentes:
+            nome = st.text_input("Nome completo do Crismando *", value=val_nome)
         else:
-            nome = st.text_input("Nome completo do Crismando *")
+            # Em modo de edição, apenas exibe textualmente o nome travado
+            st.markdown(f"**Modificando o perfil de:** `{val_nome}`")
+            nome = val_nome
             
-        turma = st.selectbox("Turma", ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
-        presenca = st.select_slider("Nível de Presença", options=["Baixa", "Média", "Alta"], value="Média")
+        turmas_disponiveis = ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"]
+        idx_turma = turmas_disponiveis.index(val_turma)
+        turma = st.selectbox("Turma", turmas_disponiveis, index=idx_turma)
+        
+        presencas_disponiveis = ["Baixa", "Média", "Alta"]
+        idx_presenca = presencas_disponiveis.index(val_presenca)
+        presenca = st.select_slider("Nível de Presença", options=presencas_disponiveis, value=val_presenca)
         
         col1, col2 = st.columns(2)
-        batismo = col1.radio("Possui Batismo?", ["Sim", "Não"])
-        eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"])
+        idx_batismo = 1 if val_batismo == "Não" else 0
+        batismo = col1.radio("Possui Batismo?", ["Sim", "Não"], index=idx_batismo)
         
-        qualidades_input = st.text_area("Escreva as Qualidades:")
-        defeitos_input = st.text_area("Escreva os Defeitos:")
-        foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
+        idx_eucaristia = 1 if val_eucaristia == "Não" else 0
+        eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"], index=idx_eucaristia)
+        
+        qualidades_input = st.text_area("Escreva as Qualidades:", value=val_qualidades)
+        defeitos_input = st.text_area("Escreva os Defeitos:", value=val_defeitos)
+        
+        # Melhoria Visual da Foto na Edição
+        if val_foto_atual and len(val_foto_atual) > 100:
+            st.markdown("📷 **Foto atual salva na planilha:**")
+            if "data:image" in val_foto_atual:
+                val_foto_atual = val_foto_atual.split(",")[-1]
+            st.image(f"data:image/jpeg;base64,{val_foto_atual}", width=100)
+            foto = st.file_uploader("Deseja alterar a Foto de Perfil? (Deixe em branco para manter a atual)", type=["jpg", "png"])
+        else:
+            foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
         
         if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
             if not nome or not str(nome).strip():
                 st.error("O campo Nome é obrigatório!")
             else:
+                # Se for edição e o usuário não enviou uma nova foto, mantém a foto antiga string no payload
+                string_foto = img_to_base64(foto) if foto else (val_foto_atual if val_foto_atual else "")
+                
                 payload = {
                     "Nome": str(nome).strip(), 
                     "Turma": turma, 
@@ -165,7 +220,7 @@ with aba_gerenciar:
                     "Eucaristia": eucaristia,
                     "Qualidades": qualidades_input, 
                     "Defeitos": defeitos_input,
-                    "Foto": img_to_base64(foto) if foto else ""
+                    "Foto": string_foto
                 }
                 
                 with st.spinner("Conectando ao banco de dados Google..."):
