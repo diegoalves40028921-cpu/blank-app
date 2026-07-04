@@ -80,24 +80,4 @@ with aba_feed:
     else:
         df = df.dropna(subset=["Nome"])
         turmas_disponiveis = ["Todas"] + sorted(df['Turma'].dropna().unique().tolist())
-        filtro_turma = st.selectbox("🔍 Filtrar Turma:", turmas_disponiveis)
-        
-        for index, row in df.iterrows():
-            if filtro_turma != "Todas" and row['Turma'] != filtro_turma:
-                continue
-                
-            nome_jovem = str(row['Nome'])
-            letra_inicial = nome_jovem[0].upper() if nome_jovem else "👤"
-            
-            st.markdown(f"""
-            <div class="post-card">
-                <div class="post-header">
-                    <div style="width: 32px; height: 32px; background: #E1306C; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
-                        {letra_inicial}
-                    </div>
-                    <div style="font-weight: bold; color: #262626;">{nome_jovem}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            foto_salva = row.get('Foto', "")
-            if pd.notna
+        filtro_
