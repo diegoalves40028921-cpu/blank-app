@@ -4,6 +4,7 @@ from PIL import Image
 import base64
 import io
 import requests
+import time  # <--- NOVO: Importante para segurar a mensagem na tela!
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
@@ -11,7 +12,7 @@ st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="center
 # --- LINKS ---
 url_planilha_csv = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/export?format=csv"
 
-# ⚠️ COLE AQUI A NOVA URL GERADA NO PASSO 1
+# ⚠️ SUBSTITUA O TEXTO ABAIXO PELA SUA URL DO GOOGLE (QUE TERMINA EM /exec)
 url_script_google = "COLE_A_NOVA_URL_AQUI"
 
 # --- ESTILO CSS PARA O PERFIL ---
@@ -157,6 +158,8 @@ with aba_gerenciar:
         if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
             if not nome or not str(nome).strip():
                 st.error("O campo Nome é obrigatório!")
+            elif url_script_google == "COLE_A_NOVA_URL_AQUI":
+                st.error("⚠️ Você esqueceu de substituir 'COLE_A_NOVA_URL_AQUI' pelo link do seu Google Apps Script!")
             else:
                 payload = {
                     "Nome": str(nome).strip(), 
@@ -169,15 +172,19 @@ with aba_gerenciar:
                     "Foto": img_to_base64(foto) if foto else ""
                 }
                 
-                try:
-                    res = requests.post(url_script_google, json=payload)
-                    if res.status_code == 200:
-                        st.success("Dados salvos com sucesso!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    elif res.status_code == 401:
-                        st.error("⚠️ **Erro 401: Não Autorizado!** Volte ao Apps Script e mude 'Quem tem acesso' para 'Qualquer pessoa'.")
-                    else:
-                        st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
-                except Exception as e:
-                    st.error(f"Erro de conexão: {e}")
+                # Feedback visual de carregamento
+                with st.spinner("Enviando dados para a Planilha Google..."):
+                    try:
+                        res = requests.post(url_script_google, json=payload)
+                        if res.status_code == 200:
+                            st.success("🎉 Dados salvos com sucesso no Google Sheets!")
+                            st.cache_data.clear()
+                            time.sleep(2.0)  # NOVO: Dá 2 segundos para você ver o aviso de sucesso!
+                            st.rerun()
+                        elif res.status_code == 401:
+                            st.error("⚠️ **Erro 401: Não Autorizado!** Volte ao Apps Script e mude 'Quem tem acesso' para 'Qualquer pessoa'.")
+                        else:
+                            st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
+                            st.info(f"Resposta técnica: {res.text}")
+                    except Exception as e:
+                        st.error(f"Erro de conexão com o script: {e}")
