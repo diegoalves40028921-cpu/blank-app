@@ -9,7 +9,7 @@ import time
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Gerenciador de Jovens da Crisma", page_icon="🕊️", layout="centered")
 
-# --- LINKS (ATUALIZADO COM O SEU NOVO SCRIPT) ---
+# --- LINKS ---
 url_planilha_csv = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/export?format=csv"
 url_script_google = "https://script.google.com/macros/s/AKfycbwex6IBKOW418weukD9wdLlHVEA5fNXJkTGn2LwCF3TG1U9Dh0oMpTwVPA7Fnyk_XKvnA/exec"
 
@@ -89,40 +89,52 @@ with aba_perfil:
             nome_selecionado = col_n.selectbox("Escolha o Crismando", df_filtrado["Nome"].tolist())
             row = df_filtrado[df_filtrado["Nome"] == nome_selecionado].iloc[0]
             
-            # --- CARD DO PERFIL ---
-            st.markdown('<div class="profile-card">', unsafe_allow_html=True)
+            # --- CONSTRUÇÃO DO CARD UNIFICADO EM HTML ---
             
+            # 1. Tratar a Foto
             foto_string = str(row['Foto']).strip() if pd.notna(row['Foto']) else ""
             if len(foto_string) > 100:
                 if "data:image" in foto_string:
                     foto_string = foto_string.split(",")[-1]
-                st.image(f"data:image/jpeg;base64,{foto_string}", width=220)
+                # Insere a foto diretamente dentro de uma tag <img>
+                img_html = f'<img src="data:image/jpeg;base64,{foto_string}" style="width: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">'
             else:
-                st.warning("👤 Perfil sem foto de identificação disponível.")
-                
-            st.markdown(f'<div class="profile-name">{row["Nome"]}</div>', unsafe_allow_html=True)
+                img_html = '<div style="background-color: #FFF3CD; padding: 10px; border-radius: 8px; color: #856404; font-size: 14px; text-align: center; width: 220px;">👤 Perfil sem foto</div>'
             
+            # 2. Tratar Textos
             turma_val = row["Turma"] if str(row["Turma"]).strip() != "" else "Não informada"
-            st.markdown(f'<div class="profile-detail">Membro da <strong>{turma_val}</strong></div>', unsafe_allow_html=True)
-            
-            if str(row['Batismo']).strip().upper() == "NÃO":
-                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM BATISMO</div>', unsafe_allow_html=True)
-            if str(row['Eucaristia']).strip().upper() == "NÃO":
-                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>', unsafe_allow_html=True)
-                
             presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
-            st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
-            
             qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
             defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
             
-            st.markdown('<div class="section-title">✅ Qualidades / Pontos Positivos:</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="section-content">{qualidades_val}</div>', unsafe_allow_html=True)
+            # 3. Tratar Alertas
+            alertas_html = ""
+            if str(row['Batismo']).strip().upper() == "NÃO":
+                alertas_html += '<div class="alert-box">⚠️ ATENÇÃO: SEM BATISMO</div>'
+            if str(row['Eucaristia']).strip().upper() == "NÃO":
+                alertas_html += '<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>'
+                
+            # 4. Unir tudo num único Bloco HTML
+            html_card_completo = f"""
+            <div class="profile-card">
+                {img_html}
+                <div class="profile-name">{row["Nome"]}</div>
+                <div class="profile-detail">Membro da <strong>{turma_val}</strong></div>
+                
+                {alertas_html}
+                
+                <div class="badge-presenca">Frequência/Presença: {presenca_val}</div>
+                
+                <div class="section-title">✅ Qualidades / Pontos Positivos:</div>
+                <div class="section-content">{qualidades_val}</div>
+                
+                <div class="section-title">❌ Defeitos / Pontos a Melhorar:</div>
+                <div class="section-content">{defeitos_val}</div>
+            </div>
+            """
             
-            st.markdown('<div class="section-title">❌ Defeitos / Pontos a Melhorar:</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="section-content">{defeitos_val}</div>', unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Renderiza o cartão final de uma só vez
+            st.markdown(html_card_completo, unsafe_allow_html=True)
 
 # --- ABA 2: CADASTRAR, EDITAR OU DELETAR ---
 with aba_gerenciar:
