@@ -75,4 +75,74 @@ with aba_perfil:
     if df.empty:
         st.info("Nenhum perfil válido carregado. Registre o primeiro membro na aba ao lado.")
     else:
-        st.markdown("### Selecione quem deseja
+        st.markdown("### Selecione quem deseja visualizar:")
+        col_t, col_n = st.columns(2)
+        
+        turma_f = col_t.selectbox("Filtrar por Turma", ["Todas", "Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
+        df_filtrado = df if turma_f == "Todas" else df[df["Turma"] == turma_f]
+        
+        if df_filtrado.empty:
+            st.warning("Nenhum crismando encontrado nesta turma.")
+        else:
+            nome_selecionado = col_n.selectbox("Escolha o Crismando", df_filtrado["Nome"].tolist())
+            row = df_filtrado[df_filtrado["Nome"] == nome_selecionado].iloc[0]
+            
+            # --- CARD DO PERFIL ---
+            st.markdown('<div class="profile-card">', unsafe_allow_html=True)
+            
+            foto_string = str(row['Foto']).strip() if pd.notna(row['Foto']) else ""
+            if len(foto_string) > 100:
+                if "data:image" in foto_string:
+                    foto_string = foto_string.split(",")[-1]
+                st.image(f"data:image/jpeg;base64,{foto_string}", width=220)
+            else:
+                st.warning("👤 Perfil sem foto de identificação disponível.")
+                
+            st.markdown(f'<div class="profile-name">{row["Nome"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="profile-detail">Membro da <strong>{row["Turma"]}</strong></div>', unsafe_allow_html=True)
+            
+            if str(row['Batismo']).strip().upper() == "NÃO":
+                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM BATISMO</div>', unsafe_allow_html=True)
+            if str(row['Eucaristia']).strip().upper() == "NÃO":
+                st.markdown('<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>', unsafe_allow_html=True)
+                
+            presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
+            st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
+            
+            qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
+            defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
+            
+            st.markdown('<div class="section-title">✅ Qualidades / Pontos Positivos:</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-content">{qualidades_val}</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="section-title">❌ Defeitos / Pontos a Melhorar:</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-content">{defeitos_val}</div>', unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+
+# --- ABA 2: CADASTRAR, EDITAR OU DELETAR ---
+with aba_gerenciar:
+    st.markdown("### 📝 Painel de Administração de Perfis")
+    
+    df_lista = carregar_dados()
+    nomes_existentes = []
+    if not df_lista.empty:
+        df_lista = df_lista.dropna(subset=["Nome"])
+        nomes_existentes = [n for n in df_lista["Nome"].tolist() if str(n).strip() != ""]
+
+    modo = st.radio("O que deseja fazer?", ["Criar novo perfil (Digitar)", "Editar perfil existente", "❌ Excluir um perfil"], horizontal=True)
+    
+    # --- FLUXO 1: DELETAR PERFIL ---
+    if modo == "❌ Excluir um perfil":
+        if not nomes_existentes:
+            st.warning("Não há nenhum perfil cadastrado para excluir.")
+        else:
+            st.markdown("#### 🗑️ Excluir Crismando definitivamente")
+            nome_para_deletar = st.selectbox("Selecione o perfil que deseja APAGAR:", nomes_existentes, key="del_box")
+            
+            st.warning(f"⚠️ **Atenção:** Você está prestes a apagar permanentemente o perfil de **{nome_para_deletar}** da planilha. Esta ação não pode ser desfeita.")
+            
+            confirmou = st.checkbox(f"Estou ciente e quero deletar permanentemente o perfil de {nome_para_deletar}.", value=False)
+            
+            if st.button("🔥 Confirmar Exclusão Definitiva", disabled=not confirmou, type="primary"):
+                payload_delete = {"Nome
