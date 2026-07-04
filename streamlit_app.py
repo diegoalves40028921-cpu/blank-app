@@ -27,12 +27,19 @@ st.markdown("""
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# --- FUNÇÃO DE CARREGAR BLINDADA CONTRA ERROS ---
 @st.cache_data(ttl=10)
 def carregar_dados():
+    colunas_necessarias = ["Nome", "Turma", "Presenca", "Batismo", "Eucaristia", "Qualidades", "Defeitos", "Foto"]
     try:
-        return conn.read(spreadsheet=url_planilha)
+        df = conn.read(spreadsheet=url_planilha)
+        # Se faltar alguma coluna na planilha, o Python cria na hora para não dar erro
+        for col in colunas_necessarias:
+            if col not in df.columns:
+                df[col] = ""
+        return df
     except:
-        return pd.DataFrame(columns=["Nome", "Turma", "Presenca", "Batismo", "Eucaristia", "Qualidades", "Defeitos", "Foto"])
+        return pd.DataFrame(columns=colunas_necessarias)
 
 def img_to_base64(image_file):
     if image_file:
@@ -51,10 +58,12 @@ aba_feed, aba_novo, aba_editar = st.tabs(["🏠 Feed", "➕ Novo Perfil", "✏�
 # --- ABA 1: FEED ---
 with aba_feed:
     df = carregar_dados()
-    if df.empty:
-        st.info("Nenhum perfil cadastrado.")
+    if df.empty or df["Nome"].astype(str).str.strip().eq("").all():
+        st.info("Nenhum perfil cadastrado. Crie um na aba ao lado!")
     else:
         df = df.dropna(subset=["Nome"])
+        df = df[df["Nome"].astype(str).str.strip() != ""] # Remove linhas vazias
+        
         turma_f = st.selectbox("Filtrar Turma", ["Todas", "Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
         if turma_f != "Todas":
             df = df[df["Turma"] == turma_f]
@@ -93,11 +102,70 @@ with aba_novo:
     with st.form("novo_p"):
         nome = st.text_input("Nome completo")
         turma = st.selectbox("Turma", ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
-        presenca = st.select_slider("Nível de Presença", options=["Baixa", "Média", "Alta"])
+        presenca = st.select_slider("Nível de Presença", options=["Baixa", "Média", "Alta"], value="Alta")
         
         col1, col2 = st.columns(2)
         batismo = col1.radio("Possui Batismo?", ["Sim", "Não"])
         eucaristia = col2.radio("Fez 1ª Eucaristia?", ["Sim", "Não"])
         
         qualidades = st.text_area("Qualidades (Pontos Positivos)")
-        defeitos
+        defeitos = st.text_area("Defeitos (Pontos a melhorar)")
+        foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
+        
+        if st.form_submit_button("Salvar Perfil"):
+            if not nome:
+                st.error("Por favor, preencha o Nome!")
+            else:
+                payload = {
+                    "Nome": nome, "Turma": turma, "Presenca": presenca,
+                    "Batismo": batismo, "Eucaristia": eucaristia,
+                    "Qualidades": qualidades, "Defeitos": defeitos,
+                    "Foto": img_to_base64(foto) if foto else "",
+                    "action": "create"
+                }
+                try:
+                    res = requests.post(url_script_google, json=payload)
+                    if res.status_code == 200:
+                        st.success("Salvo com sucesso!")
+                        st.cache_data.clear()
+                    else:
+                        st.error("Erro no servidor do Google.")
+                except Exception as e:
+                    st.error(f"Erro de conexão: {e}")
+
+# --- ABA 3: EDITAR PERFIL ---
+with aba_editar:
+    df_edit = carregar_dados()
+    df_edit = df_edit.dropna(subset=["Nome"])
+    df_edit = df_edit[df_edit["Nome"].astype(str).str.strip() != ""]
+    
+    if not df_edit.empty:
+        nome_edit = st.selectbox("Selecione quem deseja editar", df_edit["Nome"].tolist())
+        user_data = df_edit[df_edit["Nome"] == nome_edit].iloc[0]
+        
+        with st.form("edit_p"):
+            lista_turmas = ["Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"]
+            idx_turma = lista_turmas.index(user_data["Turma"]) if user_data["Turma"] in lista_turmas else 0
+            new_turma = st.selectbox("Nova Turma", lista_turmas, index=idx_turma)
+            
+            new_presenca = st.select_slider("Nova Presença", options=["Baixa", "Média", "Alta"], value=user_data["Presenca"] if user_data["Presenca"] in ["Baixa", "Média", "Alta"] else "Alta")
+            new_batismo = st.radio("Novo Batismo", ["Sim", "Não"], index=0 if user_data["Batismo"] == "Sim" else 1)
+            new_eucaristia = st.radio("Nova Eucaristia", ["Sim", "Não"], index=0 if user_data["Eucaristia"] == "Sim" else 1)
+            new_qualidades = st.text_area("Novas Qualidades", value=str(user_data["Qualidades"]))
+            new_defeitos = st.text_area("Novos Defeitos", value=str(user_data["Defeitos"]))
+            
+            st.info("Para trocar a foto, crie um novo perfil ou edite diretamente na planilha do Google.")
+            
+            if st.form_submit_button("Atualizar Dados"):
+                payload_edit = {
+                    "Nome": nome_edit, "Turma": new_turma, "Presenca": new_presenca,
+                    "Batismo": new_batismo, "Eucaristia": new_eucaristia,
+                    "Qualidades": new_qualidades, "Defeitos": new_defeitos,
+                    "action": "edit"
+                }
+                res = requests.post(url_script_google, json=payload_edit)
+                if res.status_code == 200:
+                    st.success("Dados atualizados!")
+                    st.cache_data.clear()
+    else:
+        st.info("Cadastre pelo menos um perfil para poder editar.")
