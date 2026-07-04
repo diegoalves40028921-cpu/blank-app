@@ -50,3 +50,44 @@ aba_feed, aba_novo, aba_editar = st.tabs(["🏠 Feed", "➕ Novo Perfil", "✏�
 
 # --- ABA 1: FEED ---
 with aba_feed:
+    df = carregar_dados()
+    if df.empty:
+        st.info("Nenhum perfil cadastrado.")
+    else:
+        df = df.dropna(subset=["Nome"])
+        turma_f = st.selectbox("Filtrar Turma", ["Todas", "Turma 1", "Turma 2", "Turma 3", "Turma 4", "Turma 5"])
+        if turma_f != "Todas":
+            df = df[df["Turma"] == turma_f]
+
+        for _, row in df.iterrows():
+            with st.container():
+                # Alertas de Sacramentos
+                alertas = ""
+                if str(row['Batismo']).upper() == "NÃO": alertas += '<span class="alert-badge">SEM BATISMO</span>'
+                if str(row['Eucaristia']).upper() == "NÃO": alertas += '<span class="alert-badge">SEM 1ª EUCARISTIA</span>'
+                
+                st.markdown(f"""
+                <div class="post-card">
+                    <div class="post-header">
+                        <span>👤 {row['Nome']} ({row['Turma']})</span>
+                        <div>{alertas}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if pd.notna(row['Foto']) and len(str(row['Foto'])) > 100:
+                    st.image(f"data:image/jpeg;base64,{row['Foto']}", use_container_width=True)
+                
+                st.markdown(f"""
+                <div class="post-card" style="margin-top:-20px; border-top:none;">
+                    <div class="post-content">
+                        <span class="badge">Presença: {row['Presenca']}</span><br><br>
+                        <strong>✅ Qualidades:</strong> {row['Qualidades']}<br>
+                        <strong>❌ Defeitos:</strong> {row['Defeitos']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+# --- ABA 2: NOVO PERFIL ---
+with aba_novo:
+    with st.form("novo_p"):
