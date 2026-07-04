@@ -10,8 +10,8 @@ import requests
 st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="centered")
 
 # --- 2. CONFIGURAÇÕES DE LINKS ---
-# Substitua pela URL real de visualização da sua planilha pública
-url_planilha = "COLE_AQUI_O_LINK_DA_SUA_PLANILHA_DO_GOOGLE"
+# O seu link da planilha foi inserido aqui:
+url_planilha = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/edit?usp=sharing"
 
 # Sua URL do App da Web (Script do Google) para receber os novos dados
 url_script_google = "https://script.google.com/macros/s/AKfycbzMq22vbopzFdvVD6gfliJu9McSAJetnmbEd_YxerKkJtuM4Fl9jwiKDUiUqug4gvhI4Q/exec"
