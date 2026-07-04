@@ -10,8 +10,9 @@ st.set_page_config(page_title="CrismaGram Pro", page_icon="📸", layout="center
 
 # --- LINKS ---
 url_planilha_csv = "https://docs.google.com/spreadsheets/d/182OkAojppcXhIyxDiVlzY-bcFscW-pN3T8EJdQNc1Sc/export?format=csv"
-# Cole aqui a nova URL que copiou após atualizar o Google Apps Script
-url_script_google = "https://script.google.com/macros/s/AKfycbzMq22vbopzFdvVD6gfliJu9McSAJetnmbEd_YxerKkJtuM4Fl9jwiKDUiUqug4gvhI4Q/exec"
+
+# ⚠️ COLE AQUI A NOVA URL GERADA NO PASSO 1
+url_script_google = "COLE_A_NOVA_URL_AQUI"
 
 # --- ESTILO CSS PARA O PERFIL ---
 st.markdown("""
@@ -35,13 +36,12 @@ def carregar_dados():
         response = requests.get(url_planilha_csv)
         if response.status_code == 200:
             df = pd.read_csv(io.StringIO(response.text), dtype=str)
-            # Garante que todas as colunas necessárias existem no DataFrame
             for col in colunas_necessarias:
                 if col not in df.columns:
                     df[col] = ""
             return df
         elif response.status_code == 404:
-            st.error("⚠️ **Erro 404: Planilha Privada!** No canto superior direito da Planilha do Google, mude o acesso geral para **'Qualquer pessoa com o link pode ver'**.")
+            st.error("⚠️ **Erro 404: Planilha Privada!** No canto superior direito da Planilha, mude o acesso para 'Qualquer pessoa com o link'.")
             return pd.DataFrame(columns=colunas_necessarias)
         else:
             return pd.DataFrame(columns=colunas_necessarias)
@@ -53,7 +53,7 @@ def img_to_base64(image_file):
     if image_file:
         img = Image.open(image_file)
         img = img.convert("RGB")
-        img = img.resize((350, 350)) 
+        img = img.resize((350, 350))
         buffered = io.BytesIO()
         img.save(buffered, format="JPEG", quality=60)
         return base64.b64encode(buffered.getvalue()).decode()
@@ -74,7 +74,7 @@ with aba_perfil:
         df = df[df["Nome"].astype(str).str.contains(r'[a-zA-Z]', na=False)]
         
     if df.empty:
-        st.info("Nenhum perfil válido carregado. Configure a planilha e registe o primeiro membro na aba ao lado.")
+        st.info("Nenhum perfil válido carregado. Registe o primeiro membro na aba ao lado.")
     else:
         st.markdown("### Selecione quem deseja visualizar:")
         col_t, col_n = st.columns(2)
@@ -113,7 +113,7 @@ with aba_perfil:
             presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
             st.markdown(f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>', unsafe_allow_html=True)
             
-            # Qualidades e Defeitos Formatados Corretamente
+            # Qualidades e Defeitos Formatados
             qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
             defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
             
