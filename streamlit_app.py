@@ -20,7 +20,7 @@ st.markdown("""
     .profile-card { background-color: white; border: 1px solid #DBDBDB; border-radius: 12px; padding: 24px; margin-top: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.02); }
     .profile-name { font-size: 24px; font-weight: bold; color: #262626; margin-bottom: 4px; margin-top: 15px; }
     .profile-detail { font-size: 14px; color: #8E8E8E; margin-bottom: 15px; }
-    .badge-presenca { background-color: #E8F0FE; color: #1A73E8; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; display: inline-block; margin-bottom: 15px; }
+    .badge-presenca { background-color: #E8F0FE; color: #1A73E8; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; display: inline-block; margin-bottom: 15px; margin-top: 10px; }
     .alert-box { background-color: #FFEBEB; border-left: 4px solid #FF4B4B; color: #D93025; padding: 10px; border-radius: 4px; font-size: 13px; font-weight: bold; margin-bottom: 10px; }
     .section-title { font-size: 16px; font-weight: bold; color: #262626; margin-top: 15px; margin-bottom: 5px; display: flex; align-items: center; }
     .section-content { background-color: #F8F9FA; padding: 12px; border-radius: 8px; font-size: 14px; color: #4A4A4A; border: 1px solid #E0E0E0; line-height: 1.5; }
@@ -89,14 +89,11 @@ with aba_perfil:
             nome_selecionado = col_n.selectbox("Escolha o Crismando", df_filtrado["Nome"].tolist())
             row = df_filtrado[df_filtrado["Nome"] == nome_selecionado].iloc[0]
             
-            # --- CONSTRUÇÃO DO CARD UNIFICADO EM HTML ---
-            
             # 1. Tratar a Foto
             foto_string = str(row['Foto']).strip() if pd.notna(row['Foto']) else ""
             if len(foto_string) > 100:
                 if "data:image" in foto_string:
                     foto_string = foto_string.split(",")[-1]
-                # Insere a foto diretamente dentro de uma tag <img>
                 img_html = f'<img src="data:image/jpeg;base64,{foto_string}" style="width: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">'
             else:
                 img_html = '<div style="background-color: #FFF3CD; padding: 10px; border-radius: 8px; color: #856404; font-size: 14px; text-align: center; width: 220px;">👤 Perfil sem foto</div>'
@@ -104,8 +101,8 @@ with aba_perfil:
             # 2. Tratar Textos
             turma_val = row["Turma"] if str(row["Turma"]).strip() != "" else "Não informada"
             presenca_val = row['Presenca'] if pd.notna(row['Presenca']) and str(row['Presenca']).strip() != "" else "Não informada"
-            qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registrada ainda."
-            defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registrado."
+            qualidades_val = row['Qualidades'] if pd.notna(row['Qualidades']) and str(row['Qualidades']).strip() != "" else "Nenhuma qualidade registada ainda."
+            defeitos_val = row['Defeitos'] if pd.notna(row['Defeitos']) and str(row['Defeitos']).strip() != "" else "Nenhum defeito registado."
             
             # 3. Tratar Alertas
             alertas_html = ""
@@ -114,26 +111,22 @@ with aba_perfil:
             if str(row['Eucaristia']).strip().upper() == "NÃO":
                 alertas_html += '<div class="alert-box">⚠️ ATENÇÃO: SEM 1ª EUCARISTIA</div>'
                 
-            # 4. Unir tudo num único Bloco HTML
-            html_card_completo = f"""
-            <div class="profile-card">
-                {img_html}
-                <div class="profile-name">{row["Nome"]}</div>
-                <div class="profile-detail">Membro da <strong>{turma_val}</strong></div>
-                
-                {alertas_html}
-                
-                <div class="badge-presenca">Frequência/Presença: {presenca_val}</div>
-                
-                <div class="section-title">✅ Qualidades / Pontos Positivos:</div>
-                <div class="section-content">{qualidades_val}</div>
-                
-                <div class="section-title">❌ Defeitos / Pontos a Melhorar:</div>
-                <div class="section-content">{defeitos_val}</div>
-            </div>
-            """
+            # 4. Unir tudo numa única string sem quebras de linha para evitar bugs do Markdown
+            html_card_completo = (
+                f'<div class="profile-card">'
+                f'{img_html}'
+                f'<div class="profile-name">{row["Nome"]}</div>'
+                f'<div class="profile-detail">Membro da <strong>{turma_val}</strong></div>'
+                f'{alertas_html}'
+                f'<div class="badge-presenca">Frequência/Presença: {presenca_val}</div>'
+                f'<div class="section-title">✅ Qualidades / Pontos Positivos:</div>'
+                f'<div class="section-content">{qualidades_val}</div>'
+                f'<div class="section-title">❌ Defeitos / Pontos a Melhorar:</div>'
+                f'<div class="section-content">{defeitos_val}</div>'
+                f'</div>'
+            )
             
-            # Renderiza o cartão final de uma só vez
+            # Renderiza o cartão final
             st.markdown(html_card_completo, unsafe_allow_html=True)
 
 # --- ABA 2: CADASTRAR, EDITAR OU DELETAR ---
@@ -145,23 +138,23 @@ with aba_gerenciar:
     if not df_lista.empty:
         nomes_existentes = [n for n in df_lista["Nome"].tolist() if str(n).strip() != ""]
 
-    modo = st.radio("O que deseja fazer?", ["Criar novo perfil (Digitar)", "Editar perfil existente", "❌ Excluir um perfil"], horizontal=True)
+    modo = st.radio("O que deseja fazer?", ["Criar novo perfil", "Editar perfil existente", "❌ Eliminar um perfil"], horizontal=True)
     
     # --- FLUXO 1: DELETAR PERFIL ---
-    if modo == "❌ Excluir um perfil":
+    if modo == "❌ Eliminar um perfil":
         if not nomes_existentes:
-            st.warning("Não há nenhum perfil cadastrado para excluir.")
+            st.warning("Não há nenhum perfil registado para eliminar.")
         else:
-            st.markdown("#### 🗑️ Excluir Crismando definitivamente")
+            st.markdown("#### 🗑️ Eliminar Crismando definitivamente")
             nome_para_deletar = st.selectbox("Selecione o perfil que deseja APAGAR:", nomes_existentes, key="del_box")
             
-            st.warning(f"⚠️ **Atenção:** Você está prestes a apagar permanentemente o perfil de **{nome_para_deletar}** da planilha. Esta ação não pode ser desfeita.")
+            st.warning(f"⚠️ **Atenção:** Está prestes a apagar permanentemente o perfil de **{nome_para_deletar}** da folha de cálculo. Esta ação não pode ser revertida.")
             
-            confirmou = st.checkbox(f"Estou ciente e quero deletar permanentemente o perfil de {nome_para_deletar}.", value=False)
+            confirmou = st.checkbox(f"Estou ciente e quero eliminar permanentemente o perfil de {nome_para_deletar}.", value=False)
             
-            if st.button("🔥 Confirmar Exclusão Definitiva", disabled=not confirmou, type="primary"):
+            if st.button("🔥 Confirmar Eliminação Definitiva", disabled=not confirmou, type="primary"):
                 payload_delete = {"Nome": nome_para_deletar, "Acao": "EXCLUIR"}
-                with st.spinner("Excluindo registro no Google Sheets..."):
+                with st.spinner("A eliminar registo no Google Sheets..."):
                     try:
                         res = requests.post(url_script_google, json=payload_delete, allow_redirects=True)
                         if res.status_code == 200:
@@ -172,7 +165,7 @@ with aba_gerenciar:
                         else:
                             st.error(f"Erro do servidor Google: {res.status_code}")
                     except Exception as e:
-                        st.error(f"Erro de rede ao tentar deletar: {e}")
+                        st.error(f"Erro de rede ao tentar eliminar: {e}")
 
     # --- FLUXO 2: FORMULÁRIO DE CRIAR / EDITAR ---
     else:
@@ -230,7 +223,7 @@ with aba_gerenciar:
             defeitos_input = st.text_area("Escreva os Defeitos:", value=val_defeitos)
             
             if val_foto_atual and len(val_foto_atual) > 100:
-                st.markdown("📷 **Foto atual salva na planilha:**")
+                st.markdown("📷 **Foto atual guardada:**")
                 if "data:image" in val_foto_atual:
                     val_foto_atual = val_foto_atual.split(",")[-1]
                 st.image(f"data:image/jpeg;base64,{val_foto_atual}", width=100)
@@ -238,7 +231,7 @@ with aba_gerenciar:
             else:
                 foto = st.file_uploader("Foto de Perfil", type=["jpg", "png"])
             
-            if st.form_submit_button("🚀 Salvar / Atualizar Dados"):
+            if st.form_submit_button("🚀 Guardar / Atualizar Dados"):
                 if not nome or not str(nome).strip():
                     st.error("O campo Nome é obrigatório!")
                 else:
@@ -256,7 +249,7 @@ with aba_gerenciar:
                         "Acao": "SALVAR"
                     }
                     
-                    with st.spinner("Conectando ao banco de dados Google..."):
+                    with st.spinner("A conectar à base de dados do Google..."):
                         try:
                             res = requests.post(url_script_google, json=payload, allow_redirects=True)
                             if res.status_code == 200:
@@ -265,6 +258,6 @@ with aba_gerenciar:
                                 time.sleep(1.5)
                                 st.rerun()
                             else:
-                                st.error(f"Erro ao enviar dados. Código HTTP: {res.status_code}")
+                                st.error(f"Erro ao enviar os dados. Código HTTP: {res.status_code}")
                         except Exception as e:
-                            st.error(f"Erro crítico de conexão: {e}")
+                            st.error(f"Erro crítico de rede: {e}")
