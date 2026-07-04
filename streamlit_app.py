@@ -41,15 +41,31 @@ def carregar_dados():
     try:
         return conn.read(spreadsheet=url_planilha)
     except Exception:
-        # Se der erro ou estiver vazia, cria a estrutura básica
         return pd.DataFrame(columns=["Nome", "Turma", "Presenca", "Notas", "Batismo", "Eucaristia", "ParaTirar", "Foto"])
 
+# --- FUNÇÃO DE TRATAMENTO DE FOTO (JPEG + PNG) ---
 def img_to_base64(image_file):
     if image_file:
+        # Abre a imagem enviada (pode ser PNG, JPEG, etc.)
         img = Image.open(image_file)
+        
+        # Se a imagem tiver transparência (comum em PNG), removemos para não dar erro no JPEG
+        if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+            # Cria um fundo branco do mesmo tamanho da imagem
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            # Cola a imagem por cima do fundo branco usando a própria transparência como máscara
+            background.paste(img, mask=img.convert("RGBA").split()[3])
+            img = background
+        elif img.mode != "RGB":
+            # Converte outros formatos de cores comuns para RGB padrão
+            img = img.convert("RGB")
+            
+        # Redimensiona a foto para um quadrado perfeito (estilo Instagram) e otimiza o peso
         img = img.resize((400, 400)) 
+        
+        # Transforma a imagem processada em texto seguro para guardar na planilha
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=70)
+        img.save(buffered, format="JPEG", quality=75)
         return base64.b64encode(buffered.getvalue()).decode()
     return ""
 
@@ -65,7 +81,6 @@ with aba_feed:
     if df.empty or "Nome" not in df.columns:
         st.info("Nenhum perfil publicado ainda. Vá na aba 'Criar Novo Perfil'!")
     else:
-        # Remove linhas em branco se houver
         df = df.dropna(subset=["Nome"])
         
         turmas_disponiveis = ["Todas"] + sorted(df['Turma'].dropna().unique().tolist())
@@ -78,7 +93,6 @@ with aba_feed:
             nome_jovem = str(row['Nome'])
             letra_inicial = nome_jovem[0].upper() if nome_jovem else "👤"
             
-            # Cabeçalho do card
             st.markdown(f"""
             <div class="post-card">
                 <div class="post-header">
@@ -89,14 +103,12 @@ with aba_feed:
                 </div>
             """, unsafe_allow_html=True)
             
-            # Foto do card
             foto_salva = row.get('Foto', "")
             if pd.notna(foto_salva) and len(str(foto_salva)) > 100:
                 st.image("data:image/jpeg;base64," + str(foto_salva), use_container_width=True)
             else:
                 st.markdown('<div style="width: 100%; height: 300px; background: #fafafa; display: flex; align-items: center; justify-content: center; color: #ccc;">Sem Foto</div>', unsafe_allow_html=True)
                 
-            # Detalhes e status do crismando
             status_batismo = "✅ Batizado" if row.get('Batismo') else "❌ Sem Batismo"
             status_euca = "✅ 1ª Comunhão" if row.get('Eucaristia') else "❌ Sem Eucaristia"
             
@@ -134,29 +146,4 @@ with aba_novo:
         col_b, col_e, col_t = st.columns(3)
         batismo = col_b.checkbox("Batizado")
         eucaristia = col_e.checkbox("1ª Comunhão")
-        tirar = col_t.checkbox("⚠️ Afastar")
-        
-        arquivo_foto = st.file_uploader("📷 Carregar Foto do Crismando", type=["jpg", "png", "jpeg"])
-        
-        if st.form_submit_button("Publicar Perfil"):
-            if nome:
-                foto_base64 = img_to_base64(arquivo_foto)
-                
-                nova_linha = pd.DataFrame([{
-                    "Nome": nome,
-                    "Turma": turma,
-                    "Presenca": presenca,
-                    "Notas": notas,
-                    "Batismo": batismo,
-                    "Eucaristia": eucaristia,
-                    "ParaTirar": tirar,
-                    "Foto": foto_base64
-                }])
-                
-                df_atualizado = pd.concat([df_atual, nova_linha], ignore_index=True)
-                conn.update(spreadsheet=url_planilha, data=df_atualizado)
-                
-                st.success("Perfil publicado com sucesso!")
-                st.rerun()
-            else:
-                st.error("Por favor, preencha o nome.")
+        tirar
